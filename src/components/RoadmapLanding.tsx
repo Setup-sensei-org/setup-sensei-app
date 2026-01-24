@@ -175,17 +175,6 @@ export function RoadmapLanding({ onDrillClick, roadmapNodes }: RoadmapLandingPro
 
         {/* Main headline */}
         <div className="relative z-10 text-center mb-24">
-          <div
-            className="inline-block px-6 py-2 mb-8"
-            style={{
-              border: "1px solid #ff003c",
-              background: "rgba(255, 0, 60, 0.05)",
-            }}
-          >
-            <span className="font-mono text-[10px] tracking-wider text-[#ff003c]">
-              NEURAL_TRAINING_PROTOCOL
-            </span>
-          </div>
           <h1
             className="text-[8rem] leading-[0.85] font-black tracking-tighter uppercase mb-6"
             style={{
