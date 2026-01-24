@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-[#050505] text-white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="%23ff0033" stroke-width="1.5"/><circle cx="12" cy="12" r="1.5" fill="%23ff0033"/><line x1="12" y1="2" x2="12" y2="8" stroke="%23ff0033" stroke-width="1.5"/><line x1="12" y1="16" x2="12" y2="22" stroke="%23ff0033" stroke-width="1.5"/><line x1="2" y1="12" x2="8" y2="12" stroke="%23ff0033" stroke-width="1.5"/><line x1="16" y1="12" x2="22" y2="12" stroke="%23ff0033" stroke-width="1.5"/></svg>') 12 12, crosshair;
+  }
+}
+
+/* Scan-line overlay effect */
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+.scanline-overlay::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 0, 60, 0.1), transparent);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Glitch effect */
+@keyframes glitch {
+  0%, 100% {
+    transform: translate(0);
+  }
+  33% {
+    transform: translate(-2px, 2px);
+  }
+  66% {
+    transform: translate(2px, -2px);
+  }
+}
+
+.glitch-hover:hover {
+  animation: glitch 0.3s ease-in-out;
+}
+
+/* Circuit glow pulse */
+@keyframes circuit-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.5) drop-shadow(0 0 8px #ff003c);
+  }
+}
+
+.circuit-pulse {
+  animation: circuit-pulse 2s ease-in-out infinite;
+}
+
+/* Hexagon pulse for active node */
+@keyframes hexagon-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 8px #ff003c);
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 16px #ff003c) drop-shadow(0 0 24px #ff003c);
+  }
+}
+
+.hexagon-pulse {
+  animation: hexagon-pulse 1.5s ease-in-out infinite;
+}
+
+/* Slide-in animation for Active Drill screen */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
