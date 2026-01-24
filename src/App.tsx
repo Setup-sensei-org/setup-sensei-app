@@ -4,6 +4,7 @@ import { AnalyticsScreen } from './components/screens/AnalyticsScreen';
 import { AccountScreen } from './components/screens/AccountScreen';
 import { ActiveDrillScreen } from './components/screens/ActiveDrillScreen';
 import { SideNavRail } from './components/SideNavRail';
+import { BackgroundTexture } from './components/BackgroundTexture';
 import { DrillDetail } from './types';
 import { login, signup, setAuthToken } from './services/api';
 import { AuthPayload } from './types';
@@ -44,7 +45,10 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen bg-[#050505] overflow-hidden flex scanline-overlay">
+    <div className="h-screen overflow-hidden flex relative">
+      {/* Background Texture Layer */}
+      <BackgroundTexture />
+      
       {/* Side Navigation Rail */}
       <SideNavRail activeScreen={activeScreen} onNavigate={setActiveScreen} />
 
