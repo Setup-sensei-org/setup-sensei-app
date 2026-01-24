@@ -194,19 +194,6 @@ export function RoadmapLanding({ onDrillClick, roadmapNodes }: RoadmapLandingPro
             PROGRESS THROUGH THE DIGITAL BOXING GYM
           </p>
         </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 circuit-pulse">
-          <span className="font-mono text-[9px] tracking-wider text-[#ff003c]">
-            SCROLL_TO_BEGIN
-          </span>
-          <div
-            className="w-[1px] h-16 bg-gradient-to-b from-[#ff003c] to-transparent"
-            style={{
-              boxShadow: "0 0 8px #ff003c",
-            }}
-          />
-        </div>
       </section>
 
       {/* Roadmap Path Section */}
