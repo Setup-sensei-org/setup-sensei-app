@@ -2,27 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { HexagonNode } from "./HexagonNode";
 import { CircuitPath } from "./CircuitPath";
 import { FreestyleDrillLibrary } from "./FreestyleDrillLibrary";
-
-interface RoadmapLevel {
-  level: number;
-  title: string;
-  status: "completed" | "active" | "locked";
-  description?: string;
-  pathDirection?: "left" | "right" | "straight";
-}
-
-interface DrillData {
-  name: string;
-  category: string;
-  difficulty: string;
-  sets: string;
-}
+import { RoadmapNode, DrillDetail, DrillOverview, DrillDifficulty, Biometrics, LiveFeedback } from "../types";
 
 interface RoadmapLandingProps {
-  onDrillClick: (drill: DrillData) => void;
+  onDrillClick: (drill: DrillDetail) => void;
+  roadmapNodes?: RoadmapNode[]; // Optional: will use mock data if not provided
 }
 
-export function RoadmapLanding({ onDrillClick }: RoadmapLandingProps) {
+export function RoadmapLanding({ onDrillClick, roadmapNodes }: RoadmapLandingProps) {
   const [scrollProgress, setScrollProgress] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -45,67 +32,75 @@ export function RoadmapLanding({ onDrillClick }: RoadmapLandingProps) {
     }
   }, []);
 
-  const levels: RoadmapLevel[] = [
+  // Use provided roadmapNodes or fallback to mock data for UI development
+  const levels: RoadmapNode[] = roadmapNodes || [
     {
+      id: '1',
       level: 1,
       title: "STANCE",
+      subtitle: "FOUNDATION BASICS",
       status: "completed",
+      type: "FUNDAMENTALS",
       description: "FOUNDATION BASICS",
       pathDirection: "right",
     },
     {
+      id: '2',
       level: 2,
       title: "JAB-CROSS",
+      subtitle: "FUNDAMENTAL COMBO",
       status: "completed",
+      type: "STRIKING",
       description: "FUNDAMENTAL COMBO",
       pathDirection: "left",
     },
     {
+      id: '3',
       level: 3,
       title: "1-2-HOOK",
+      subtitle: "POWER SEQUENCE",
       status: "active",
+      type: "POWER",
       description: "POWER SEQUENCE",
       pathDirection: "right",
     },
     {
+      id: '4',
       level: 4,
       title: "UPPERCUT",
       status: "locked",
+      type: "STRIKING",
       pathDirection: "left",
     },
     {
+      id: '5',
       level: 5,
       title: "SLIP-ROLL",
       status: "locked",
+      type: "DEFENSE",
       pathDirection: "right",
     },
     {
+      id: '6',
       level: 6,
       title: "COUNTER",
       status: "locked",
+      type: "ADVANCED",
       pathDirection: "straight",
     },
     {
+      id: '7',
       level: 7,
       title: "ADVANCED",
       status: "locked",
+      type: "MASTERY",
       pathDirection: "left",
     },
   ];
 
-  // Map levels to drill data
-  const getDrillFromLevel = (level: RoadmapLevel): DrillData => {
-    const categoryMap: Record<number, string> = {
-      1: 'FUNDAMENTALS',
-      2: 'STRIKING',
-      3: 'POWER',
-      4: 'STRIKING',
-      5: 'DEFENSE',
-      6: 'ADVANCED',
-      7: 'MASTERY',
-    };
-
-    const difficultyMap: Record<number, string> = {
+  // Map roadmap node to drill detail
+  const getDrillFromLevel = (node: RoadmapNode): DrillDetail => {
+    const difficultyMap: Record<number, DrillDifficulty> = {
       1: 'BEG',
       2: 'INT',
       3: 'INT',
@@ -125,12 +120,34 @@ export function RoadmapLanding({ onDrillClick }: RoadmapLandingProps) {
       7: '6x10',
     };
 
-    return {
-      name: level.title,
-      category: categoryMap[level.level] || 'TRAINING',
-      difficulty: difficultyMap[level.level] || 'INT',
-      sets: setsMap[level.level] || '3x10',
+    const overview: DrillOverview = {
+      id: node.id,
+      title: node.title,
+      category: node.type,
+      duration: '5 MIN',
+      intensity: 'MEDIUM',
     };
+
+    const drillDetail: DrillDetail = {
+      id: node.id,
+      overview,
+      sets: setsMap[node.level] || '3x10',
+      difficulty: difficultyMap[node.level] || 'INT',
+      biometrics: {
+        impact_force_kgf: 840.00,
+        rotation_x_deg: 12.5,
+        rotation_y_deg: 45.2,
+        rotation_z_deg: -4.3,
+        acceleration_ms2: 1.2,
+      },
+      liveFeedback: {
+        posture_score: 98.3,
+        balance_status: 'OPTIMAL',
+        neural_sync_status: 'READY',
+      },
+    };
+
+    return drillDetail;
   };
 
   return (
@@ -236,7 +253,7 @@ export function RoadmapLanding({ onDrillClick }: RoadmapLandingProps) {
                   level={level.level}
                   title={level.title}
                   status={level.status}
-                  description={level.description}
+                  description={level.description || level.subtitle}
                   onClick={() => {
                     if (level.status !== "locked") {
                       onDrillClick(getDrillFromLevel(level));
@@ -305,7 +322,7 @@ export function RoadmapLanding({ onDrillClick }: RoadmapLandingProps) {
       </section>
 
       {/* Freestyle Drill Library Section */}
-      <FreestyleDrillLibrary onDrillClick={onDrillClick} />
+      <FreestyleDrillLibrary onDrillClick={(drill) => onDrillClick(drill)} />
 
       {/* Footer */}
       <footer className="py-16 text-center border-t border-[#1a1a1a]">

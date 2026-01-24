@@ -1,9 +1,25 @@
 import { useState } from 'react';
+import { AuthPayload } from '../../types';
 
-export function AccountScreen() {
+interface AccountScreenProps {
+  onSubmit?: (payload: AuthPayload) => void; // Optional callback for when form is submitted
+}
+
+export function AccountScreen({ onSubmit }: AccountScreenProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(''); // For signup
   const [isFocused, setIsFocused] = useState<string | null>(null);
+  const [isSignup, setIsSignup] = useState(false);
+
+  const handleSubmit = () => {
+    const payload: AuthPayload = {
+      username,
+      password,
+      ...(isSignup && { email }), // Include email only for signup
+    };
+    onSubmit?.(payload);
+  };
 
   return (
     <div className="h-screen overflow-y-auto flex items-center justify-center px-16 relative">
@@ -93,6 +109,28 @@ export function AccountScreen() {
             />
           </div>
 
+          {/* Email Field (for signup) */}
+          {isSignup && (
+            <div>
+              <label className="font-mono text-[10px] text-gray-500 tracking-wider block mb-3">
+                EMAIL
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setIsFocused('email')}
+                onBlur={() => setIsFocused(null)}
+                className="w-full bg-transparent border px-5 py-4 font-mono text-sm text-white outline-none transition-all duration-300"
+                style={{
+                  borderColor: isFocused === 'email' ? '#ff003c' : '#333333',
+                  boxShadow: isFocused === 'email' ? '0 0 16px rgba(255, 0, 60, 0.3)' : 'none',
+                }}
+                placeholder="ENTER_EMAIL"
+              />
+            </div>
+          )}
+
           {/* Password Field */}
           <div>
             <label className="font-mono text-[10px] text-gray-500 tracking-wider block mb-3">
@@ -115,6 +153,7 @@ export function AccountScreen() {
 
           {/* Submit Button */}
           <button 
+            onClick={handleSubmit}
             className="w-full border-2 py-5 font-mono text-sm transition-all duration-300 hover:scale-[1.02] active:scale-95"
             style={{
               borderColor: '#ff003c',
@@ -131,15 +170,23 @@ export function AccountScreen() {
               e.currentTarget.style.color = '#ff003c';
             }}
           >
-            INITIALIZE_LINK
+            {isSignup ? 'CREATE_ACCOUNT' : 'INITIALIZE_LINK'}
           </button>
         </div>
 
         {/* Footer */}
-        <div className="mt-10 pt-8 border-t text-center" style={{ borderColor: '#1a1a1a' }}>
-          <button className="font-mono text-[10px] text-gray-500 tracking-wider hover:text-[#ff003c] transition-colors">
-            FORGOT_CREDENTIALS?
+        <div className="mt-10 pt-8 border-t text-center space-y-3" style={{ borderColor: '#1a1a1a' }}>
+          <button 
+            onClick={() => setIsSignup(!isSignup)}
+            className="font-mono text-[10px] text-gray-500 tracking-wider hover:text-[#ff003c] transition-colors block w-full"
+          >
+            {isSignup ? 'ALREADY_HAVE_ACCOUNT?' : 'CREATE_NEW_ACCOUNT?'}
           </button>
+          {!isSignup && (
+            <button className="font-mono text-[10px] text-gray-500 tracking-wider hover:text-[#ff003c] transition-colors">
+              FORGOT_CREDENTIALS?
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -1,12 +1,8 @@
 import { ChevronLeft } from 'lucide-react';
+import { DrillDetail } from '../../types';
 
 interface ActiveDrillScreenProps {
-  drill: {
-    name: string;
-    category: string;
-    difficulty: string;
-    sets: string;
-  };
+  drill: DrillDetail;
   onBack: () => void;
 }
 
@@ -33,12 +29,12 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
             textShadow: '0 0 30px rgba(255, 0, 60, 0.4)',
           }}
         >
-          {drill.name}
+          {drill.overview.title}
         </h1>
         <div className="flex items-center gap-6">
           <div>
             <span className="font-mono text-[9px] text-gray-500 tracking-wider block mb-1">CATEGORY</span>
-            <span className="font-mono text-sm text-white">{drill.category}</span>
+            <span className="font-mono text-sm text-white">{drill.overview.category}</span>
           </div>
           <div className="w-[1px] h-8 bg-[#1a1a1a]" />
           <div>
@@ -147,11 +143,11 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
               >
                 <div className="font-mono text-[10px] flex justify-between">
                   <span className="text-gray-500">POSTURE:</span>
-                  <span className="text-[#ff003c]">98.3%</span>
+                  <span className="text-[#ff003c]">{drill.liveFeedback.posture_score.toFixed(1)}%</span>
                 </div>
                 <div className="font-mono text-[10px] flex justify-between">
                   <span className="text-gray-500">BALANCE:</span>
-                  <span className="text-[#ff003c]">OPTIMAL</span>
+                  <span className="text-[#ff003c]">{drill.liveFeedback.balance_status}</span>
                 </div>
               </div>
             </div>
@@ -184,7 +180,7 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                   className="font-mono text-6xl text-white mb-2"
                   style={{ fontFamily: 'JetBrains Mono, monospace' }}
                 >
-                  0.00
+                  {drill.biometrics.impact_force_kgf.toFixed(2)}
                 </div>
                 <div className="font-mono text-sm text-gray-500">
                   kgf
@@ -205,7 +201,7 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                     ROTATION_X
                   </div>
                   <div className="font-mono text-3xl text-white mb-1">
-                    --
+                    {drill.biometrics.rotation_x_deg.toFixed(1)}
                   </div>
                   <div className="font-mono text-[10px] text-gray-500">
                     degrees
@@ -223,7 +219,7 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                     ROTATION_Y
                   </div>
                   <div className="font-mono text-3xl text-white mb-1">
-                    --
+                    {drill.biometrics.rotation_y_deg.toFixed(1)}
                   </div>
                   <div className="font-mono text-[10px] text-gray-500">
                     degrees
@@ -245,7 +241,7 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                     ROTATION_Z
                   </div>
                   <div className="font-mono text-3xl text-white mb-1">
-                    --
+                    {drill.biometrics.rotation_z_deg.toFixed(1)}
                   </div>
                   <div className="font-mono text-[10px] text-gray-500">
                     degrees
@@ -263,7 +259,7 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                     ACCELERATION
                   </div>
                   <div className="font-mono text-3xl text-white mb-1">
-                    --
+                    {drill.biometrics.acceleration_ms2.toFixed(2)}
                   </div>
                   <div className="font-mono text-[10px] text-gray-500">
                     m/s²
@@ -281,7 +277,7 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                     NEURAL_SYNC
                   </span>
                   <span className="font-mono text-sm text-[#ff003c]">
-                    READY
+                    {drill.liveFeedback.neural_sync_status}
                   </span>
                 </div>
                 <button 

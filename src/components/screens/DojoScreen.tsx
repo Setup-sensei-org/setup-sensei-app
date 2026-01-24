@@ -1,7 +1,8 @@
 import { DrillListMobile } from '../DrillListMobile';
+import { DrillDetail } from '../../types';
 
 interface DojoScreenProps {
-  onDrillClick: (drill: { name: string; category: string; difficulty: string; sets: string }) => void;
+  onDrillClick: (drill: DrillDetail) => void;
 }
 
 export function DojoScreen({ onDrillClick }: DojoScreenProps) {

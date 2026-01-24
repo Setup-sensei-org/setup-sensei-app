@@ -4,21 +4,15 @@ import { AnalyticsScreen } from './components/screens/AnalyticsScreen';
 import { AccountScreen } from './components/screens/AccountScreen';
 import { ActiveDrillScreen } from './components/screens/ActiveDrillScreen';
 import { SideNavRail } from './components/SideNavRail';
+import { DrillDetail } from './types';
 
 type Screen = 'roadmap' | 'analytics' | 'account';
 
-interface DrillData {
-  name: string;
-  category: string;
-  difficulty: string;
-  sets: string;
-}
-
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<Screen>('roadmap');
-  const [activeDrill, setActiveDrill] = useState<DrillData | null>(null);
+  const [activeDrill, setActiveDrill] = useState<DrillDetail | null>(null);
 
-  const handleDrillClick = (drill: DrillData) => {
+  const handleDrillClick = (drill: DrillDetail) => {
     setActiveDrill(drill);
   };
 

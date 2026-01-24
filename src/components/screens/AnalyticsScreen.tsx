@@ -1,11 +1,46 @@
 import { Activity } from 'lucide-react';
+import { SessionAnalytics } from '../../types';
 
-export function AnalyticsScreen() {
+interface AnalyticsScreenProps {
+  analytics?: SessionAnalytics; // Optional: will use mock data if not provided
+}
+
+export function AnalyticsScreen({ analytics }: AnalyticsScreenProps) {
+  // Use provided analytics or fallback to mock data for UI development
+  const sessionData: SessionAnalytics = analytics || {
+    total_strikes: 12405,
+    avg_power: 840,
+    neural_sync: 98.7,
+    heart_rate: 145,
+    duration: 2852, // 47:32 in seconds
+    calories_burned: 342,
+  };
+
   const stats = [
-    { label: 'TOTAL_STRIKES', value: '12,405', unit: '', isLive: true },
-    { label: 'AVG_POWER', value: '840', unit: 'PSI', isLive: false },
-    { label: 'SPEED', value: '0.04', unit: 's', isLive: true },
-    { label: 'ACCURACY', value: '94', unit: '%', isLive: false },
+    { 
+      label: 'TOTAL_STRIKES', 
+      value: sessionData.total_strikes.toLocaleString(), 
+      unit: '', 
+      isLive: true 
+    },
+    { 
+      label: 'AVG_POWER', 
+      value: sessionData.avg_power.toString(), 
+      unit: 'PSI', 
+      isLive: false 
+    },
+    { 
+      label: 'SPEED', 
+      value: (sessionData.duration / sessionData.total_strikes).toFixed(2), 
+      unit: 's', 
+      isLive: true 
+    },
+    { 
+      label: 'ACCURACY', 
+      value: '94', 
+      unit: '%', 
+      isLive: false 
+    },
   ];
 
   return (
@@ -113,7 +148,7 @@ export function AnalyticsScreen() {
                 color: '#ffffff',
               }}
             >
-              47:32
+              {Math.floor(sessionData.duration / 60)}:{(sessionData.duration % 60).toString().padStart(2, '0')}
             </div>
           </div>
           <div>
@@ -127,7 +162,7 @@ export function AnalyticsScreen() {
                 color: '#ffffff',
               }}
             >
-              342
+              {sessionData.calories_burned || 0}
             </div>
           </div>
           <div>
@@ -141,7 +176,7 @@ export function AnalyticsScreen() {
                 color: '#ff003c',
               }}
             >
-              98.7%
+              {sessionData.neural_sync.toFixed(1)}%
             </div>
           </div>
         </div>

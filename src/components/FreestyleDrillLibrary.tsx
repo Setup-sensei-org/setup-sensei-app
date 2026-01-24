@@ -1,29 +1,17 @@
 import { useState } from 'react';
 import { Clock, Zap, Target } from 'lucide-react';
-
-interface DrillCard {
-  id: string;
-  title: string;
-  category: string;
-  duration: string;
-  intensity: string;
-}
-
-interface DrillData {
-  name: string;
-  category: string;
-  difficulty: string;
-  sets: string;
-}
+import { DrillOverview, DrillDetail, DrillDifficulty, Biometrics, LiveFeedback } from '../types';
 
 interface FreestyleDrillLibraryProps {
-  onDrillClick?: (drill: DrillData) => void;
+  onDrillClick?: (drill: DrillDetail) => void;
+  drills?: DrillOverview[]; // Optional: will use mock data if not provided
 }
 
-export function FreestyleDrillLibrary({ onDrillClick }: FreestyleDrillLibraryProps) {
+export function FreestyleDrillLibrary({ onDrillClick, drills: drillOverviews }: FreestyleDrillLibraryProps) {
   const [selectedDrill, setSelectedDrill] = useState<string | null>(null);
 
-  const drills: DrillCard[] = [
+  // Use provided drills or fallback to mock data for UI development
+  const drills: DrillOverview[] = drillOverviews || [
     {
       id: '1',
       title: 'SPEED JAB DRILL',
@@ -68,29 +56,48 @@ export function FreestyleDrillLibrary({ onDrillClick }: FreestyleDrillLibraryPro
     },
   ];
 
-  const convertToDrillData = (drill: DrillCard): DrillData => {
-    const difficultyMap: Record<string, string> = {
+  const convertToDrillDetail = (overview: DrillOverview): DrillDetail => {
+    const difficultyMap: Record<string, DrillDifficulty> = {
       'LOW': 'BEG',
       'MEDIUM': 'INT',
       'HIGH': 'ADV',
       'EXTREME': 'EXP',
     };
 
+    const setsMap: Record<string, string> = {
+      'LOW': '3x8',
+      'MEDIUM': '3x10',
+      'HIGH': '4x12',
+      'EXTREME': '5x10',
+    };
+
     return {
-      name: drill.title,
-      category: drill.category,
-      difficulty: difficultyMap[drill.intensity] || 'INT',
-      sets: '3x10', // Default sets
+      id: overview.id,
+      overview,
+      sets: setsMap[overview.intensity] || '3x10',
+      difficulty: difficultyMap[overview.intensity] || 'INT',
+      biometrics: {
+        impact_force_kgf: 840.00,
+        rotation_x_deg: 12.5,
+        rotation_y_deg: 45.2,
+        rotation_z_deg: -4.3,
+        acceleration_ms2: 1.2,
+      },
+      liveFeedback: {
+        posture_score: 98.3,
+        balance_status: 'OPTIMAL',
+        neural_sync_status: 'READY',
+      },
     };
   };
 
-  const handleDrillClick = (drill: DrillCard) => {
+  const handleDrillClick = (drill: DrillOverview) => {
     setSelectedDrill(selectedDrill === drill.id ? null : drill.id);
   };
 
-  const handleDrillDoubleClick = (drill: DrillCard) => {
+  const handleDrillDoubleClick = (drill: DrillOverview) => {
     if (onDrillClick) {
-      onDrillClick(convertToDrillData(drill));
+      onDrillClick(convertToDrillDetail(drill));
     }
   };
 

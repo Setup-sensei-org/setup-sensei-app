@@ -1,32 +1,74 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-
-interface Drill {
-  name: string;
-  category: string;
-  difficulty: string;
-  sets: string;
-}
+import { DrillOverview, DrillDetail, DrillDifficulty, Biometrics, LiveFeedback } from '../types';
 
 interface DrillListMobileProps {
-  onDrillClick: (drill: Drill) => void;
+  onDrillClick: (drill: DrillDetail) => void;
+  drills?: DrillOverview[]; // Optional: will use mock data if not provided
 }
 
-export function DrillListMobile({ onDrillClick }: DrillListMobileProps) {
+export function DrillListMobile({ onDrillClick, drills: drillOverviews }: DrillListMobileProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const drills: Drill[] = [
-    { name: 'MUAY THAI CLINCH', category: 'GRAPPLING', difficulty: 'ADV', sets: '3x12' },
-    { name: 'ROUNDHOUSE KICK', category: 'STRIKING', difficulty: 'INT', sets: '5x10' },
-    { name: 'TEEP DEFENSE', category: 'DEFENSE', difficulty: 'BEG', sets: '4x8' },
+  // Use provided drills or fallback to mock data for UI development
+  const drillOverviewsData: DrillOverview[] = drillOverviews || [
+    { id: '1', title: 'MUAY THAI CLINCH', category: 'GRAPPLING', duration: '5 MIN', intensity: 'HIGH' },
+    { id: '2', title: 'ROUNDHOUSE KICK', category: 'STRIKING', duration: '4 MIN', intensity: 'MEDIUM' },
+    { id: '3', title: 'TEEP DEFENSE', category: 'DEFENSE', duration: '3 MIN', intensity: 'LOW' },
   ];
+
+  // Convert DrillOverview to DrillDetail for click handler
+  const convertToDrillDetail = (overview: DrillOverview, difficulty: DrillDifficulty, sets: string): DrillDetail => {
+    return {
+      id: overview.id,
+      overview,
+      sets,
+      difficulty,
+      biometrics: {
+        impact_force_kgf: 840.00,
+        rotation_x_deg: 12.5,
+        rotation_y_deg: 45.2,
+        rotation_z_deg: -4.3,
+        acceleration_ms2: 1.2,
+      },
+      liveFeedback: {
+        posture_score: 98.3,
+        balance_status: 'OPTIMAL',
+        neural_sync_status: 'READY',
+      },
+    };
+  };
+
+  // Map intensity to difficulty and sets
+  const getDifficultyFromIntensity = (intensity: string): DrillDifficulty => {
+    const map: Record<string, DrillDifficulty> = {
+      'LOW': 'BEG',
+      'MEDIUM': 'INT',
+      'HIGH': 'ADV',
+      'EXTREME': 'EXP',
+    };
+    return map[intensity] || 'INT';
+  };
+
+  const getSetsFromIntensity = (intensity: string): string => {
+    const map: Record<string, string> = {
+      'LOW': '3x8',
+      'MEDIUM': '3x10',
+      'HIGH': '4x12',
+      'EXTREME': '5x10',
+    };
+    return map[intensity] || '3x10';
+  };
 
   const isActive = (index: number) => activeIndex === index || hoveredIndex === index;
 
   return (
     <div className="space-y-3">
-      {drills.map((drill, index) => (
+      {drillOverviewsData.map((drill, index) => {
+        const difficulty = getDifficultyFromIntensity(drill.intensity);
+        const sets = getSetsFromIntensity(drill.intensity);
+        return (
         <div
           key={index}
           className="border transition-all duration-300 cursor-pointer relative overflow-hidden"
@@ -41,7 +83,7 @@ export function DrillListMobile({ onDrillClick }: DrillListMobileProps) {
           onMouseUp={() => setActiveIndex(null)}
           onTouchStart={() => setActiveIndex(index)}
           onTouchEnd={() => setActiveIndex(null)}
-          onClick={() => onDrillClick(drill)}
+          onClick={() => onDrillClick(convertToDrillDetail(drill, difficulty, sets))}
         >
           <div className="px-4 py-4">
             <div className="flex items-center justify-between mb-2">
@@ -52,7 +94,7 @@ export function DrillListMobile({ onDrillClick }: DrillListMobileProps) {
                   color: isActive(index) ? '#ffffff' : '#ff0033'
                 }}
               >
-                {drill.name}
+                {drill.title}
               </h3>
               <ChevronRight 
                 size={20} 
@@ -89,7 +131,7 @@ export function DrillListMobile({ onDrillClick }: DrillListMobileProps) {
                     color: isActive(index) ? '#ffffff' : '#ff0033'
                   }}
                 >
-                  {drill.difficulty}
+                  {difficulty}
                 </div>
               </div>
 
@@ -103,13 +145,14 @@ export function DrillListMobile({ onDrillClick }: DrillListMobileProps) {
                     color: isActive(index) ? '#ffffff' : '#ffffff'
                   }}
                 >
-                  {drill.sets}
+                  {sets}
                 </div>
               </div>
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
