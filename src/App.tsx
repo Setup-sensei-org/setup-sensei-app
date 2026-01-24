@@ -5,6 +5,8 @@ import { AccountScreen } from './components/screens/AccountScreen';
 import { ActiveDrillScreen } from './components/screens/ActiveDrillScreen';
 import { SideNavRail } from './components/SideNavRail';
 import { DrillDetail } from './types';
+import { login, signup, setAuthToken } from './services/api';
+import { AuthPayload } from './types';
 
 type Screen = 'roadmap' | 'analytics' | 'account';
 
@@ -18,6 +20,27 @@ export default function App() {
 
   const handleBackToRoadmap = () => {
     setActiveDrill(null);
+  };
+
+  const handleAuthSubmit = async (payload: AuthPayload) => {
+    try {
+      // Determine if this is a signup (has email) or login (no email)
+      const isSignup = !!payload.email;
+      
+      // Call the appropriate API endpoint
+      const response = isSignup 
+        ? await signup(payload)
+        : await login(payload);
+
+      // Store the authentication token
+      setAuthToken(response.access_token);
+
+      // TODO: Handle successful authentication (e.g., redirect, update UI state)
+      console.log('Authentication successful:', response.user);
+    } catch (error) {
+      // TODO: Handle authentication errors (e.g., show error message to user)
+      console.error('Authentication failed:', error);
+    }
   };
 
   return (
@@ -38,7 +61,7 @@ export default function App() {
           <>
             {activeScreen === 'roadmap' && <RoadmapLanding onDrillClick={handleDrillClick} />}
             {activeScreen === 'analytics' && <AnalyticsScreen />}
-            {activeScreen === 'account' && <AccountScreen />}
+            {activeScreen === 'account' && <AccountScreen onSubmit={handleAuthSubmit} />}
           </>
         )}
       </div>
