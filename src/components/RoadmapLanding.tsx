@@ -7,9 +7,10 @@ import { RoadmapNode, DrillDetail, DrillOverview, DrillDifficulty, Biometrics, L
 interface RoadmapLandingProps {
   onDrillClick: (drill: DrillDetail) => void;
   roadmapNodes?: RoadmapNode[]; // Optional: will use mock data if not provided
+  drills?: DrillOverview[]; // Optional: will use mock data in library if not provided
 }
 
-export function RoadmapLanding({ onDrillClick, roadmapNodes }: RoadmapLandingProps) {
+export function RoadmapLanding({ onDrillClick, roadmapNodes, drills }: RoadmapLandingProps) {
   const [scrollProgress, setScrollProgress] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +34,8 @@ export function RoadmapLanding({ onDrillClick, roadmapNodes }: RoadmapLandingPro
   }, []);
 
   // Use provided roadmapNodes or fallback to mock data for UI development
-  const levels: RoadmapNode[] = roadmapNodes || [
+  // If Supabase returns an empty array for this user, keep showing the mock roadmap
+  const levels: RoadmapNode[] = roadmapNodes && roadmapNodes.length > 0 ? roadmapNodes : [
     {
       id: '1',
       level: 1,
@@ -298,7 +300,10 @@ export function RoadmapLanding({ onDrillClick, roadmapNodes }: RoadmapLandingPro
       </section>
 
       {/* Freestyle Drill Library Section */}
-      <FreestyleDrillLibrary onDrillClick={(drill) => onDrillClick(drill)} />
+      <FreestyleDrillLibrary
+        onDrillClick={(drill) => onDrillClick(drill)}
+        drills={drills}
+      />
 
       {/* Footer */}
       <footer className="py-16 text-center border-t border-[#1a1a1a]">

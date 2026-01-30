@@ -1,0 +1,68 @@
+-- Create table for reference motion recordings
+CREATE TABLE public.reference_recordings (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  technique_id TEXT NOT NULL,
+  technique_name TEXT NOT NULL,
+  recorded_by UUID NOT NULL,
+  recorded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  sample_rate INTEGER NOT NULL DEFAULT 500,
+  rep_count INTEGER NOT NULL DEFAULT 10,
+  metadata JSONB,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create table for individual motion samples (high-frequency data)
+CREATE TABLE public.motion_samples (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  recording_id UUID NOT NULL REFERENCES public.reference_recordings(id) ON DELETE CASCADE,
+  timestamp_ms BIGINT NOT NULL,
+  rep_number INTEGER NOT NULL,
+  -- Quaternions
+  q0 NUMERIC NOT NULL,
+  q1 NUMERIC NOT NULL,
+  q2 NUMERIC NOT NULL,
+  q3 NUMERIC NOT NULL,
+  -- Acceleration (g)
+  ax NUMERIC NOT NULL,
+  ay NUMERIC NOT NULL,
+  az NUMERIC NOT NULL,
+  -- Angular velocity (degrees/sec)
+  wx NUMERIC NOT NULL,
+  wy NUMERIC NOT NULL,
+  wz NUMERIC NOT NULL,
+  -- Calculated peak intensity
+  peak_intensity NUMERIC NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create indexes for fast queries
+CREATE INDEX idx_motion_samples_recording ON public.motion_samples(recording_id);
+CREATE INDEX idx_motion_samples_rep ON public.motion_samples(recording_id, rep_number);
+CREATE INDEX idx_reference_recordings_technique ON public.reference_recordings(technique_id);
+
+-- Enable RLS
+ALTER TABLE public.reference_recordings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.motion_samples ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies for reference_recordings
+CREATE POLICY "Anyone can view reference recordings"
+ON public.reference_recordings FOR SELECT
+USING (true);
+
+CREATE POLICY "Authenticated users can create reference recordings"
+ON public.reference_recordings FOR INSERT
+WITH CHECK (auth.uid() = recorded_by);
+
+-- RLS policies for motion_samples
+CREATE POLICY "Anyone can view motion samples"
+ON public.motion_samples FOR SELECT
+USING (true);
+
+CREATE POLICY "Authenticated users can insert motion samples"
+ON public.motion_samples FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.reference_recordings
+    WHERE id = recording_id AND recorded_by = auth.uid()
+  )
+);

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { AuthPayload } from '../../types';
 
 interface AccountScreenProps {
-  onSubmit?: (payload: AuthPayload) => void; // Optional callback for when form is submitted
+  onSubmit?: (payload: AuthPayload, mode: 'login' | 'signup') => void; // Optional callback for when form is submitted
 }
 
 export function AccountScreen({ onSubmit }: AccountScreenProps) {
@@ -14,10 +14,11 @@ export function AccountScreen({ onSubmit }: AccountScreenProps) {
   const [isSignup, setIsSignup] = useState(false);
 
   const handleSubmit = () => {
+    const mode: 'login' | 'signup' = isSignup ? 'signup' : 'login';
     const payload: AuthPayload = {
       username,
       password,
-      ...(isSignup && { email }), // Include email only for signup
+      email,
     };
     onSubmit?.(payload);
   };

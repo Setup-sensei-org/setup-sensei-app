@@ -1,0 +1,10 @@
+-- Migration 16: Add username column to profiles and backfill
+
+-- Add a username column separate from auth password handling
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS username text;
+
+-- Backfill username for existing rows using name or email prefix
+UPDATE public.profiles
+SET username = COALESCE(name, split_part(email, '@', 1))
+WHERE username IS NULL;

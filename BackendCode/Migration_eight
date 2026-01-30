@@ -1,0 +1,33 @@
+-- Create waiting_list table
+CREATE TABLE public.waiting_list (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  country TEXT NOT NULL,
+  city TEXT NOT NULL,
+  phone TEXT,
+  agreed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.waiting_list ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Anyone can insert (for public signup form)
+CREATE POLICY "Anyone can sign up for waiting list"
+ON public.waiting_list
+FOR INSERT
+WITH CHECK (true);
+
+-- Policy: Only admins can view (we'll set up admin roles if needed later)
+-- For now, disable SELECT for regular users - you'll access via backend
+CREATE POLICY "Service role can view all signups"
+ON public.waiting_list
+FOR SELECT
+USING (false);
+
+-- Add index on email for faster lookups
+CREATE INDEX idx_waiting_list_email ON public.waiting_list(email);
+
+-- Add index on created_at for sorting
+CREATE INDEX idx_waiting_list_created_at ON public.waiting_list(created_at DESC);

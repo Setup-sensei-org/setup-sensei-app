@@ -1,5 +1,13 @@
+import { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { DrillDetail } from '../../types';
+import { completeAttempt, IMUFilePayload } from '../../services/attemptService';
+import {
+  collectImuSamplesForDuration,
+  collectMultiImuSamplesForDuration,
+  FFE5_SERVICE_UUID,
+  FFE4_CHAR_UUID,
+} from '../../services/bleImu';
 
 interface ActiveDrillScreenProps {
   drill: DrillDetail;
@@ -7,6 +15,146 @@ interface ActiveDrillScreenProps {
 }
 
 export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  type SensorRole = 'left_wrist' | 'right_wrist' | 'left_ankle' | 'right_ankle';
+
+  type SensorInfo = {
+    connected: boolean;
+    label: string;
+    deviceId?: string;
+    device?: BluetoothDevice;
+    server?: BluetoothRemoteGATTServer;
+    characteristic?: BluetoothRemoteGATTCharacteristic;
+  };
+
+  const [sensorStatus, setSensorStatus] = useState<Record<SensorRole, SensorInfo>>({
+    left_wrist: { connected: false, label: 'LEFT WRIST' },
+    right_wrist: { connected: false, label: 'RIGHT WRIST' },
+    left_ankle: { connected: false, label: 'LEFT ANKLE' },
+    right_ankle: { connected: false, label: 'RIGHT ANKLE' },
+  });
+
+  const [assignedDevices, setAssignedDevices] = useState<Record<string, SensorRole>>({});
+
+  const handleConnectSensor = async (role: SensorRole) => {
+    try {
+      if (typeof navigator === 'undefined' || !navigator.bluetooth) {
+        setErrorMessage('Web Bluetooth is not available in this browser.');
+        return;
+      }
+
+      setStatusMessage(`Connect ${sensorStatus[role].label} IMU in the browser prompt...`);
+
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { namePrefix: 'WT' },
+          { namePrefix: 'WitMotion' },
+        ],
+        optionalServices: [FFE5_SERVICE_UUID],
+      });
+      const server = await device.gatt!.connect();
+      const service = await server.getPrimaryService(FFE5_SERVICE_UUID);
+      const characteristic = await service.getCharacteristic(FFE4_CHAR_UUID);
+
+      const id = device.id || 'UNKNOWN_ID';
+      const name = id;
+
+      setAssignedDevices((prev) => {
+        const existingRole = prev[id];
+        if (existingRole && existingRole !== role) {
+          setErrorMessage(`This sensor is already assigned to ${existingRole.replace('_', ' ')}.`);
+          setStatusMessage(null);
+          return prev;
+        }
+
+        const next = { ...prev, [id]: role };
+
+        setSensorStatus((prevStatus) => ({
+          ...prevStatus,
+          [role]: {
+            connected: true,
+            label: name,
+            deviceId: id,
+            device,
+            server,
+            characteristic,
+          },
+        }));
+
+        setStatusMessage(null);
+        setErrorMessage(null);
+
+        return next;
+      });
+    } catch (error) {
+      console.error('Sensor connect failed', error);
+      setErrorMessage('Failed to connect sensor. Try again.');
+      setStatusMessage(null);
+    }
+  };
+
+  const handleStartTraining = async () => {
+    if (isProcessing) return;
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setErrorMessage('Please sign in before starting a drill.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    try {
+      // Collect real IMU samples over BLE for a short duration
+      const recordingDurationMs = 5000;
+      const activeSensors = (Object.entries(sensorStatus) as [SensorRole, SensorInfo][])
+        .filter(([, info]) => info.connected && info.characteristic)
+        .map(([role, info]) => ({
+          role,
+          characteristic: info.characteristic as BluetoothRemoteGATTCharacteristic,
+        }));
+
+      let samples;
+
+      if (activeSensors.length > 0) {
+        setStatusMessage('Recording from connected IMUs...');
+        samples = await collectMultiImuSamplesForDuration(activeSensors, recordingDurationMs);
+      } else {
+        setStatusMessage('Connect to your IMU in the browser prompt...');
+        samples = await collectImuSamplesForDuration(recordingDurationMs);
+      }
+
+      if (!samples.length) {
+        throw new Error('No IMU samples collected from BLE device');
+      }
+
+      setStatusMessage('Starting attempt and uploading IMU data...');
+
+      const imuPayload: IMUFilePayload = {
+        imu: samples,
+        metadata: {
+          drill_id: drill.id,
+          device: 'witmotion-ble',
+          app_version: '0.1.0',
+          recording_duration_ms: recordingDurationMs,
+        },
+      };
+
+      const attemptId = await completeAttempt(token, imuPayload);
+      setStatusMessage(`IMU data uploaded. Attempt ${attemptId} queued for processing.`);
+    } catch (error) {
+      console.error('Failed to complete attempt:', error);
+      setErrorMessage('Failed to upload IMU data. Check console for details.');
+      setStatusMessage(null);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="h-screen overflow-y-auto pb-16 animate-slide-in">
       {/* Header with Back Button */}
@@ -272,6 +420,42 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                 className="mt-8 pt-6"
                 style={{ borderTop: '1px solid rgba(255, 0, 60, 0.2)' }}
               >
+                {/* Sensor setup buttons */}
+                <div className="mb-6 grid grid-cols-2 gap-3">
+                  {(
+                    [
+                      'left_wrist',
+                      'right_wrist',
+                      'left_ankle',
+                      'right_ankle',
+                    ] as SensorRole[]
+                  ).map((role) => {
+                    const sensor = sensorStatus[role];
+                    const isConnected = sensor.connected;
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => handleConnectSensor(role)}
+                        className="border py-2 px-3 font-mono text-[10px] tracking-wider transition-colors duration-200"
+                        style={{
+                          borderColor: isConnected ? '#22c55e' : '#4b5563',
+                          color: isConnected ? '#22c55e' : '#9ca3af',
+                          background: 'transparent',
+                        }}
+                      >
+                        {isConnected
+                          ? `${role.replace('_', ' ').toUpperCase()} • ${sensor.deviceId || sensor.label} ✓`
+                          : `CONNECT ${role.replace('_', ' ').toUpperCase()}`}
+                      </button>
+                    );
+                  })}
+                </div>
+                {errorMessage && (
+                  <div className="mb-4 font-mono text-[10px] text-[#ff003c] tracking-wider">
+                    {errorMessage}
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-6">
                   <span className="font-mono text-[10px] text-gray-500 tracking-wider">
                     NEURAL_SYNC
@@ -281,7 +465,9 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                   </span>
                 </div>
                 <button 
-                  className="w-full border-2 py-5 font-mono text-sm transition-all duration-300 hover:scale-[1.02] active:scale-95"
+                  onClick={handleStartTraining}
+                  disabled={isProcessing}
+                  className="w-full border-2 py-5 font-mono text-sm transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     borderColor: '#ff003c',
                     color: '#ff003c',
@@ -297,7 +483,7 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
                     e.currentTarget.style.color = '#ff003c';
                   }}
                 >
-                  START TRAINING
+                  {isProcessing ? 'RECORDING…' : 'START TRAINING'}
                 </button>
               </div>
             </div>

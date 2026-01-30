@@ -1,0 +1,70 @@
+-- Migration 15: Create drills table for drill definitions and biometric targets
+CREATE TABLE IF NOT EXISTS public.drills (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  
+  -- Drill metadata
+  title text not null,
+  category text not null check (category in ('FUNDAMENTALS', 'STRIKING', 'POWER', 'DEFENSE', 'ADVANCED', 'MASTERY', 'TECHNIQUE', 'COMBO', 'SPEED', 'AGILITY', 'GRAPPLING')),
+  duration text not null, -- e.g., "5 MIN"
+  intensity text not null check (intensity in ('LOW', 'MEDIUM', 'HIGH', 'EXTREME')),
+  difficulty text not null check (difficulty in ('BEG', 'INT', 'ADV', 'EXP')),
+  sets text not null, -- e.g., "3x10"
+  
+  -- Biometric targets (what user should aim for)
+  impact_force_kgf numeric,
+  rotation_x_deg numeric,
+  rotation_y_deg numeric,
+  rotation_z_deg numeric,
+  acceleration_ms2 numeric,
+  
+  -- Live feedback targets
+  posture_score numeric check (posture_score >= 0 and posture_score <= 100),
+  balance_status text, -- e.g., "OPTIMAL", "GOOD", "FAIR", "POOR"
+  neural_sync_status text, -- e.g., "READY", "SYNCING", "OPTIMAL", "CALIBRATING"
+  
+  -- Media
+  thumbnail_url text,
+  
+  created_at timestamptz not null default now(),
+  updated_at timestamptz default now()
+);
+
+-- Indexes for common queries
+create index if not exists drills_user_id_idx
+  on public.drills(user_id);
+
+create index if not exists drills_category_idx
+  on public.drills(category);
+
+create index if not exists drills_difficulty_idx
+  on public.drills(difficulty);
+
+-- Enable RLS
+alter table public.drills enable row level security;
+
+-- Users can view all drills but only manage their own
+create policy "drills_select_own"
+on public.drills
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "drills_insert_own"
+on public.drills
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "drills_update_own"
+on public.drills
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "drills_delete_own"
+on public.drills
+for delete
+to authenticated
+using (auth.uid() = user_id);

@@ -1,0 +1,46 @@
+-- Stores derived metrics/results computed from a raw IMU attempt.
+-- One row per attempt per processing run (distinguished by pipeline/model versions + computed_at).
+create table if not exists public.attempt_results (
+  id uuid primary key default gen_random_uuid(),
+
+  -- Link back to the upload/session metadata
+  attempt_id uuid not null references public.attempts(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+
+  -- Provenance
+  pipeline_version text not null,
+  model_version text not null default 'model 0',
+  computed_at timestamptz not null default now(),
+
+  -- Typed "core" metrics (commonly queried)
+  overall_score int,
+  accuracy numeric,
+  duration_seconds int,
+  rep_count int,
+  avg_speed numeric,
+  peak_speed numeric,
+
+  -- Flexible payloads (evolve over time)
+  metrics jsonb not null default '{}'::jsonb,
+  quality jsonb not null default '{}'::jsonb
+);
+
+-- Useful indexes
+create index if not exists attempt_results_user_id_idx
+  on public.attempt_results (user_id);
+
+create index if not exists attempt_results_attempt_id_idx
+  on public.attempt_results (attempt_id);
+
+create index if not exists attempt_results_computed_at_idx
+  on public.attempt_results (computed_at);
+
+-- Enable RLS
+alter table public.attempt_results enable row level security;
+
+-- Users can read only their own results
+create policy "attempt_results_select_own"
+on public.attempt_results
+for select
+to authenticated
+using (auth.uid() = user_id);

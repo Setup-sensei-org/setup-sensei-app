@@ -1,0 +1,60 @@
+-- Add streak tracking fields to profiles table
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS last_workout_date DATE;
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_profiles_last_workout_date ON public.profiles(last_workout_date);
+
+-- Create function to update streak
+CREATE OR REPLACE FUNCTION public.update_user_streak(user_id_input UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  last_date DATE;
+  current_streak_val INTEGER;
+  longest_streak_val INTEGER;
+BEGIN
+  -- Get current values
+  SELECT last_workout_date, current_streak, longest_streak
+  INTO last_date, current_streak_val, longest_streak_val
+  FROM public.profiles
+  WHERE id = user_id_input;
+  
+  -- If no last workout date, this is the first workout
+  IF last_date IS NULL THEN
+    UPDATE public.profiles
+    SET current_streak = 1,
+        longest_streak = GREATEST(longest_streak, 1),
+        last_workout_date = CURRENT_DATE
+    WHERE id = user_id_input;
+    RETURN;
+  END IF;
+  
+  -- If last workout was today, don't update streak
+  IF last_date = CURRENT_DATE THEN
+    RETURN;
+  END IF;
+  
+  -- If last workout was yesterday, increment streak
+  IF last_date = CURRENT_DATE - INTERVAL '1 day' THEN
+    UPDATE public.profiles
+    SET current_streak = current_streak + 1,
+        longest_streak = GREATEST(longest_streak, current_streak + 1),
+        last_workout_date = CURRENT_DATE
+    WHERE id = user_id_input;
+    RETURN;
+  END IF;
+  
+  -- If last workout was 2+ days ago, reset streak to 1
+  UPDATE public.profiles
+  SET current_streak = 1,
+      longest_streak = GREATEST(longest_streak, 1),
+      last_workout_date = CURRENT_DATE
+  WHERE id = user_id_input;
+END;
+$$;

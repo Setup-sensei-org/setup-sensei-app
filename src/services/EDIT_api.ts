@@ -1,11 +1,18 @@
 /**
- * API Service Layer - Supabase Integration (Adapted for Actual Schema)
+ * API Service Layer - Supabase Integration
  * 
- * Uses Supabase auth + database tables:
- * - profiles (user metadata)
- * - roadmap_nodes (progression)
- * - drills (drill definitions)
- * - attempt_results (analytics)
+ * This file replaces the fetch-based API calls with Supabase SDK calls.
+ * Key differences from the original:
+ * - Uses Supabase Auth for login/signup instead of custom endpoints
+ * - Uses Supabase Database (PostgreSQL) instead of custom REST API
+ * - Automatic token management through Supabase session
+ * - Real-time capability built-in
+ * 
+ * Database Tables Required:
+ * - profiles (user profile data)
+ * - roadmap_nodes (training progression)
+ * - drills (drill definitions and data)
+ * - session_analytics (session stats)
  */
 
 import { supabase } from './supabase';
@@ -25,8 +32,18 @@ import {
 
 /**
  * Login user with email and password
+ * 
+ * Supabase Auth handles:
+ * - Password hashing and security
+ * - Session token generation
+ * - Token refresh automatically
+ * 
+ * After login:
+ * - Token stored in localStorage automatically
+ * - User can access protected tables with RLS policies
  */
 export async function login(payload: AuthPayload): Promise<AuthResponse> {
+  // Email is required for Supabase Auth
   if (!payload.email) {
     throw new Error('Email is required for login');
   }
@@ -44,20 +61,16 @@ export async function login(payload: AuthPayload): Promise<AuthResponse> {
     throw new Error('Login failed: Missing user or session data');
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username, electrical_sync_rate')
-    .eq('id', data.user.id)
-    .single();
-
+  // Create user object from auth data
   const user: User = {
     id: data.user.id,
-    username: profile?.username || data.user.email?.split('@')[0] || 'user',
-    electrical_sync_rate: profile?.electrical_sync_rate || 0,
+    username: data.user.email?.split('@')[0] || 'user',
+    electrical_sync_rate: 0,
     account_created_at: data.user.created_at,
     email: data.user.email,
   };
 
+  // Store token (Supabase stores it automatically, but we also save to localStorage for our app)
   setAuthToken(data.session.access_token);
 
   return {
@@ -68,14 +81,21 @@ export async function login(payload: AuthPayload): Promise<AuthResponse> {
 }
 
 /**
- * Signup new user with email and password.
- * Profile row is auto-created via trigger; we update username afterwards.
+ * Signup new user with email and password
+ * 
+ * Process:
+ * 1. Create auth user in Supabase Auth
+ * 2. Create profile in profiles table
+ * 3. Return auth response
+ * 
+ * Note: Email confirmation may be required depending on Supabase settings
  */
 export async function signup(payload: AuthPayload): Promise<AuthResponse> {
   if (!payload.email) {
     throw new Error('Email is required for signup');
   }
 
+  // Step 1: Create auth user
   const { data, error } = await supabase.auth.signUp({
     email: payload.email,
     password: payload.password,
@@ -89,20 +109,20 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
     throw new Error('Signup failed: Missing user data');
   }
 
-  const { error: updateError } = await supabase
+  // Step 2: Create user profile in database
+  const { error: profileError } = await supabase
     .from('profiles')
-    .update({ username: payload.username, electrical_sync_rate: 0 })
-    .eq('id', data.user.id);
+    .insert([
+      {
+        id: data.user.id,
+        username: payload.username,
+        email: payload.email,
+        electrical_sync_rate: 0,
+      },
+    ]);
 
-  if (updateError) {
-    // If the profiles table doesn't have a `username` column yet (dev DBs),
-    // continue without failing signup so the user can still sign up.
-    const msg = updateError.message || String(updateError);
-    if (msg.includes("Could not find the 'username' column") || msg.includes('column "username" does not exist')) {
-      console.warn('profiles.username missing; skipping profile update during signup.');
-    } else {
-      throw new Error(`Failed to update user profile: ${updateError.message}`);
-    }
+  if (profileError) {
+    throw new Error(`Failed to create user profile: ${profileError.message}`);
   }
 
   const user: User = {
@@ -113,6 +133,7 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
     email: payload.email,
   };
 
+  // Store token if available (may not exist immediately after signup)
   if (data.session?.access_token) {
     setAuthToken(data.session.access_token);
   }
@@ -130,17 +151,23 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
 
 /**
  * Get current user profile from Supabase
+ * 
+ * Gets both:
+ * - Auth user (email, id, created_at)
+ * - Profile data (username, sync_rate, etc.)
  */
 export async function getCurrentUser(): Promise<User> {
+  // Get current authenticated user
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authUser) {
     throw new Error('Not authenticated');
   }
 
+  // Get profile data from database
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, username, electrical_sync_rate, created_at')
+    .select('*')
     .eq('id', authUser.id)
     .single();
 
@@ -162,75 +189,40 @@ export async function getCurrentUser(): Promise<User> {
 // ============================================================================
 
 /**
- * Get session analytics from attempt_results
+ * Get session analytics from database
+ * 
+ * Fetches the latest session analytics record for the current user
+ * Uses Row Level Security (RLS) - users can only see their own data
  */
 export async function getSessionAnalytics(): Promise<SessionAnalytics> {
+  // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
     throw new Error('Not authenticated');
   }
 
-  try {
-    const { data: result, error } = await supabase
-      .from('attempt_results')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('computed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  // Fetch latest session analytics
+  const { data: analytics, error } = await supabase
+    .from('session_analytics')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
 
-    if (error) {
-      // If the table doesn't exist yet or analytics aren't wired, return safe defaults
-      const msg = error.message || String(error);
-      if (msg.includes('relation "attempt_results" does not exist')) {
-        console.warn('attempt_results table missing; returning default session analytics.');
-        return {
-          total_strikes: 0,
-          avg_power: 0,
-          neural_sync: 0,
-          heart_rate: undefined,
-          duration: 0,
-          calories_burned: undefined,
-        };
-      }
-      throw new Error(`Failed to fetch analytics: ${error.message}`);
-    }
-
-    // No analytics yet for this user; return defaults
-    if (!result) {
-      return {
-        total_strikes: 0,
-        avg_power: 0,
-        neural_sync: 0,
-        heart_rate: undefined,
-        duration: 0,
-        calories_burned: undefined,
-      };
-    }
-
-    const metrics = result.metrics || {};
-
-    return {
-      total_strikes: result.rep_count || 0,
-      avg_power: metrics.avg_power || result.peak_speed || 0,
-      neural_sync: result.accuracy || 0,
-      heart_rate: metrics.heart_rate || undefined,
-      duration: result.duration_seconds || 0,
-      calories_burned: metrics.calories_burned || undefined,
-    };
-  } catch (err) {
-    // As a final fallback, don't break the app if analytics aren't ready
-    console.warn('Session analytics not available; using defaults.', err);
-    return {
-      total_strikes: 0,
-      avg_power: 0,
-      neural_sync: 0,
-      heart_rate: undefined,
-      duration: 0,
-      calories_burned: undefined,
-    };
+  if (error) {
+    throw new Error(`Failed to fetch analytics: ${error.message}`);
   }
+
+  return {
+    total_strikes: analytics.total_strikes,
+    avg_power: analytics.avg_power,
+    neural_sync: analytics.neural_sync,
+    heart_rate: analytics.heart_rate,
+    duration: analytics.duration,
+    calories_burned: analytics.calories_burned,
+  };
 }
 
 // ============================================================================
@@ -239,14 +231,19 @@ export async function getSessionAnalytics(): Promise<SessionAnalytics> {
 
 /**
  * Get roadmap nodes for current user
+ * 
+ * Returns user's training roadmap progression
+ * Status can be: 'locked', 'active', 'completed'
  */
 export async function getRoadmapNodes(): Promise<RoadmapNode[]> {
+  // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
     throw new Error('Not authenticated');
   }
 
+  // Fetch roadmap nodes
   const { data: nodes, error } = await supabase
     .from('roadmap_nodes')
     .select('*')
@@ -274,23 +271,23 @@ export async function getRoadmapNodes(): Promise<RoadmapNode[]> {
 // ============================================================================
 
 /**
- * Get all drills (overview)
- * (Consolidated below — duplicate removed)
- */
-
-/**
- * Get drills list for current user
+ * Get all drills (overview) for current user
+ * 
+ * Returns list of available drills
+ * Each drill can be clicked to get full detail
  */
 export async function getDrills(): Promise<DrillOverview[]> {
+  // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
     throw new Error('Not authenticated');
   }
 
+  // Fetch drills
   const { data: drills, error } = await supabase
     .from('drills')
-    .select('id, title, category, duration, intensity, thumbnail_url')
+    .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true });
 
@@ -310,14 +307,21 @@ export async function getDrills(): Promise<DrillOverview[]> {
 
 /**
  * Get drill detail by ID
+ * 
+ * Returns complete drill data including:
+ * - Drill metadata (title, category, difficulty)
+ * - Biometric requirements (force, rotation, acceleration)
+ * - Live feedback targets (posture, balance, neural sync)
  */
 export async function getDrillDetail(id: string): Promise<DrillDetail> {
+  // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
     throw new Error('Not authenticated');
   }
 
+  // Fetch drill detail
   const { data: drill, error } = await supabase
     .from('drills')
     .select('*')
@@ -342,31 +346,50 @@ export async function getDrillDetail(id: string): Promise<DrillDetail> {
     sets: drill.sets,
     difficulty: drill.difficulty,
     biometrics: {
-      impact_force_kgf: drill.impact_force_kgf || 0,
-      rotation_x_deg: drill.rotation_x_deg || 0,
-      rotation_y_deg: drill.rotation_y_deg || 0,
-      rotation_z_deg: drill.rotation_z_deg || 0,
-      acceleration_ms2: drill.acceleration_ms2 || 0,
+      impact_force_kgf: drill.impact_force_kgf,
+      rotation_x_deg: drill.rotation_x_deg,
+      rotation_y_deg: drill.rotation_y_deg,
+      rotation_z_deg: drill.rotation_z_deg,
+      acceleration_ms2: drill.acceleration_ms2,
     },
     liveFeedback: {
-      posture_score: drill.posture_score || 0,
-      balance_status: drill.balance_status || 'NEUTRAL',
-      neural_sync_status: drill.neural_sync_status || 'READY',
+      posture_score: drill.posture_score,
+      balance_status: drill.balance_status,
+      neural_sync_status: drill.neural_sync_status,
     },
   };
 }
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
 /**
- * Store authentication token (optional helper for the rest of the app)
+ * Store authentication token in localStorage
+ * 
+ * Note: Supabase also stores the session automatically,
+ * but we keep it in localStorage for our app's use
  */
 export function setAuthToken(token: string): void {
   localStorage.setItem('access_token', token);
 }
 
+/**
+ * Remove authentication token and sign out
+ * 
+ * Clears both localStorage and Supabase session
+ */
 export function clearAuthToken(): void {
   localStorage.removeItem('access_token');
   supabase.auth.signOut();
 }
 
+/**
+ * Check if user is authenticated
+ * 
+ * Simple check of localStorage token
+ * For more robust checking, use getCurrentUser()
+ */
 export function isAuthenticated(): boolean {
   return !!localStorage.getItem('access_token');
 }
