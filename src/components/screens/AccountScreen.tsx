@@ -29,54 +29,6 @@ export function AccountScreen({ onSubmit }: AccountScreenProps) {
 
   return (
     <div className="h-screen overflow-y-auto flex items-center justify-center px-16 relative">
-      {/* Rotating 3D Wireframe Boxing Glove Background */}
-      <motion.svg 
-        viewBox="0 0 500 500" 
-        className="absolute w-[600px] h-[600px] opacity-20"
-        style={{ 
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-        }}
-        animate={{ 
-          rotateY: [0, 360],
-          rotateX: [0, 15, 0],
-        }}
-        transition={{ 
-          duration: 20, 
-          repeat: Infinity, 
-          ease: "linear" 
-        }}
-      >
-        <g stroke="#1A1A1A" strokeWidth="1" fill="none">
-          {/* Boxing Glove Wireframe - Simplified 3D Structure */}
-          {/* Main glove body */}
-          <ellipse cx="250" cy="250" rx="80" ry="100" />
-          <ellipse cx="250" cy="240" rx="70" ry="90" />
-          
-          {/* Wrist/cuff */}
-          <rect x="200" y="320" width="100" height="60" />
-          <line x1="200" y1="320" x2="200" y2="380" />
-          <line x1="300" y1="320" x2="300" y2="380" />
-          
-          {/* Knuckle divisions */}
-          <line x1="170" y1="230" x2="330" y2="230" />
-          <line x1="170" y1="260" x2="330" y2="260" />
-          <line x1="170" y1="290" x2="330" y2="290" />
-          
-          {/* Thumb outline */}
-          <ellipse cx="160" cy="270" rx="25" ry="40" />
-          
-          {/* 3D depth lines */}
-          <path d="M 250 150 Q 280 180 270 220" />
-          <path d="M 250 150 Q 220 180 230 220" />
-          
-          {/* Cross sections for 3D effect */}
-          <ellipse cx="250" cy="200" rx="60" ry="20" opacity="0.5" />
-          <ellipse cx="250" cy="280" rx="65" ry="22" opacity="0.5" />
-        </g>
-      </motion.svg>
-
       {/* Login Card with Premium Glassmorphism */}
       <motion.div 
         className="relative z-10 w-full max-w-md"
@@ -218,13 +170,6 @@ export function AccountScreen({ onSubmit }: AccountScreenProps) {
             {isSignup ? 'CREATE_ACCOUNT' : 'INITIALIZE_LINK'}
           </motion.button>
 
-          {/* Divider */}
-          <div className="text-center py-4">
-            <span className="font-mono text-[10px] text-gray-600">
-              // SYSTEM_OVERRIDE
-            </span>
-          </div>
-
           {/* Google Sign-On - Tactical Ghost Button */}
           <motion.button 
             onClick={handleGoogleAuth}
@@ -251,22 +196,25 @@ export function AccountScreen({ onSubmit }: AccountScreenProps) {
           </motion.button>
         </div>
 
-        {/* Footer - Pushed to absolute bottom */}
+        {/* Footer - in flow so it stays inside the black card */}
         <div 
-          className="absolute bottom-8 left-0 right-0 px-12 text-center space-y-3"
+          className="px-0 text-center"
           style={{
             borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-            paddingTop: '24px',
+            marginTop: '40px',
+            paddingTop: '32px',
+            paddingBottom: '24px',
           }}
         >
           <button 
             onClick={() => setIsSignup(!isSignup)}
             className="font-mono text-[10px] text-gray-500 tracking-wider hover:text-[#ff003c] transition-colors block w-full"
+            style={{ marginBottom: '20px' }}
           >
             {isSignup ? 'ALREADY_HAVE_ACCOUNT?' : 'CREATE_NEW_ACCOUNT?'}
           </button>
           {!isSignup && (
-            <button className="font-mono text-[10px] text-gray-500 tracking-wider hover:text-[#ff003c] transition-colors">
+            <button className="font-mono text-[10px] text-gray-500 tracking-wider hover:text-[#ff003c] transition-colors block w-full">
               FORGOT_CREDENTIALS?
             </button>
           )}
