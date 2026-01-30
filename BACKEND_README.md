@@ -320,4 +320,3 @@ Authorization: Bearer <access_token>
 ```
 
 The access token is returned in the login/signup response and should be stored client-side for subsequent requests.
-

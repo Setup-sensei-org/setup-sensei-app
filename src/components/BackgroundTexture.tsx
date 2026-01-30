@@ -11,7 +11,7 @@ export function BackgroundTexture() {
       className="fixed inset-0 pointer-events-none"
       style={{
         zIndex: -1,
-        backgroundColor: '#050505',
+        backgroundColor: 'transparent',
       }}
     >
       {/* Layer 1: Deep Vignette - Radial Gradient */}

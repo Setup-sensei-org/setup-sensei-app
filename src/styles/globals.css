@@ -2,7 +2,7 @@
 
 @layer base {
   body {
-    @apply bg-[#050505] text-white;
+    @apply bg-[#121212] text-white;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="%23ff0033" stroke-width="1.5"/><circle cx="12" cy="12" r="1.5" fill="%23ff0033"/><line x1="12" y1="2" x2="12" y2="8" stroke="%23ff0033" stroke-width="1.5"/><line x1="12" y1="16" x2="12" y2="22" stroke="%23ff0033" stroke-width="1.5"/><line x1="2" y1="12" x2="8" y2="12" stroke="%23ff0033" stroke-width="1.5"/><line x1="16" y1="12" x2="22" y2="12" stroke="%23ff0033" stroke-width="1.5"/></svg>') 12 12, crosshair;
   }
