@@ -20,7 +20,7 @@ export function AccountScreen({ onSubmit }: AccountScreenProps) {
       password,
       email,
     };
-    onSubmit?.(payload);
+    onSubmit?.(payload, mode);
   };
 
   const handleGoogleAuth = () => {

@@ -7,9 +7,6 @@ import { SideNavRail } from './components/SideNavRail';
 import { BackgroundTexture } from './components/BackgroundTexture';
 import { MatteTexture } from './components/MatteTexture';
 import { DojoMatBackground } from './components/DojoMatBackground';
-import { DrillDetail } from './types';
-import { login, signup, setAuthToken } from './services/api';
-import { AuthPayload } from './types';
 import {
   DrillDetail,
   RoadmapNode,
