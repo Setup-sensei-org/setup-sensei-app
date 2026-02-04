@@ -7,11 +7,11 @@ This document provides the API endpoint specifications and TypeScript type defin
 The following endpoints are expected from the Python/FastAPI backend:
 
 1. **POST /api/auth/login**
-   - Request body: `{ username: string, password: string }`
+   - Request body: `{ loginIdentifier: string, password: string }` (loginIdentifier can be username or email)
    - Response: `{ access_token: string, token_type: string, user: User }`
 
 2. **POST /api/auth/signup**
-   - Request body: `{ username: string, password: string, email: string }`
+   - Request body: `{ username: string, email: string, password: string }`
    - Response: `{ access_token: string, token_type: string, user: User }`
 
 3. **GET /api/user/me**
@@ -62,7 +62,8 @@ Copy the following TypeScript definitions to create corresponding Pydantic model
  * Authentication payload for both Login and Signup operations
  */
 export interface AuthPayload {
-  username: string;
+  loginIdentifier?: string; // For login: can be username or email
+  username?: string; // For signup: the desired username
   password: string;
   email?: string; // Optional for login, required for signup
 }

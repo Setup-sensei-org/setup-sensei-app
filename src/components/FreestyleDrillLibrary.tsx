@@ -11,7 +11,8 @@ export function FreestyleDrillLibrary({ onDrillClick, drills: drillOverviews }: 
   const [selectedDrill, setSelectedDrill] = useState<string | null>(null);
 
   // Use provided drills or fallback to mock data for UI development
-  const drills: DrillOverview[] = drillOverviews || [
+  // Check for both undefined and empty array
+  const drills: DrillOverview[] = (drillOverviews && drillOverviews.length > 0) ? drillOverviews : [
     {
       id: '1',
       title: 'SPEED JAB DRILL',

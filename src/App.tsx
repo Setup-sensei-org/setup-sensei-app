@@ -19,6 +19,8 @@ import {
   signup,
   setAuthToken,
   isAuthenticated,
+  loginWithGoogle,
+  initAuthFromSupabaseSession,
   getRoadmapNodes,
   getSessionAnalytics,
   getDrills,
@@ -68,10 +70,24 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      setAuthenticated(true);
-      loadData();
-    }
+    const initAuth = async () => {
+      // 1) If we already have a stored access token, trust it
+      if (isAuthenticated()) {
+        setAuthenticated(true);
+        await loadData();
+        return;
+      }
+
+      // 2) Otherwise, check if Supabase already has an active session
+      //    (e.g. after a Google OAuth redirect) and sync it
+      const hasSession = await initAuthFromSupabaseSession();
+      if (hasSession) {
+        setAuthenticated(true);
+        await loadData();
+      }
+    };
+
+    void initAuth();
   }, []);
 
   const handleAuthSubmit = async (payload: AuthPayload, mode: 'login' | 'signup') => {
@@ -95,6 +111,16 @@ export default function App() {
     } catch (error) {
       // TODO: Handle authentication errors (e.g., show error message to user)
       console.error('Authentication failed:', error);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    try {
+      await loginWithGoogle();
+      // On success, Supabase will redirect; when the app reloads,
+      // initAuthFromSupabaseSession will pick up the session.
+    } catch (error) {
+      console.error('Google authentication failed:', error);
     }
   };
 
@@ -129,7 +155,12 @@ export default function App() {
             {activeScreen === 'analytics' && (
               <AnalyticsScreen analytics={sessionAnalytics} />
             )}
-            {activeScreen === 'account' && <AccountScreen onSubmit={handleAuthSubmit} />}
+            {activeScreen === 'account' && (
+              <AccountScreen
+                onSubmit={handleAuthSubmit}
+                onGoogleAuth={handleGoogleAuth}
+              />
+            )}
           </>
         )}
       </div>

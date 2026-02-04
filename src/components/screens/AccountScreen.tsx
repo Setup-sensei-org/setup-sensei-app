@@ -4,28 +4,30 @@ import { AuthPayload } from '../../types';
 
 interface AccountScreenProps {
   onSubmit?: (payload: AuthPayload, mode: 'login' | 'signup') => void; // Optional callback for when form is submitted
+  onGoogleAuth?: () => void;
 }
 
-export function AccountScreen({ onSubmit }: AccountScreenProps) {
+export function AccountScreen({ onSubmit, onGoogleAuth }: AccountScreenProps) {
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [email, setEmail] = useState(''); // For signup
+  const [email, setEmail] = useState('');
   const [isFocused, setIsFocused] = useState<string | null>(null);
   const [isSignup, setIsSignup] = useState(false);
 
   const handleSubmit = () => {
     const mode: 'login' | 'signup' = isSignup ? 'signup' : 'login';
     const payload: AuthPayload = {
-      username,
+      loginIdentifier: isSignup ? undefined : loginIdentifier,
+      username: isSignup ? username : undefined,
       password,
-      email,
+      email: isSignup ? email : undefined,
     };
     onSubmit?.(payload, mode);
   };
 
   const handleGoogleAuth = () => {
-    // TODO: Implement Google OAuth
-    console.log('Google authentication not yet implemented');
+    onGoogleAuth?.();
   };
 
   return (
@@ -86,24 +88,24 @@ export function AccountScreen({ onSubmit }: AccountScreenProps) {
 
         {/* Form */}
         <div className="space-y-6">
-          {/* Username Field - Filled Style */}
+          {/* Login: Email or Username Field | Signup: Username Field */}
           <div className="relative">
             <label className="font-mono text-[10px] text-gray-500 tracking-wider block mb-3">
-              USERNAME
+              {isSignup ? 'USERNAME' : 'EMAIL_OR_USERNAME'}
             </label>
             <input
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onFocus={() => setIsFocused('username')}
+              value={isSignup ? username : loginIdentifier}
+              onChange={(e) => isSignup ? setUsername(e.target.value) : setLoginIdentifier(e.target.value)}
+              onFocus={() => setIsFocused(isSignup ? 'username' : 'loginIdentifier')}
               onBlur={() => setIsFocused(null)}
               className="w-full px-5 py-4 font-mono text-sm text-white outline-none transition-all duration-300"
               style={{
                 backgroundColor: '#111111',
                 border: 'none',
-                borderBottom: isFocused === 'username' ? '2px solid #FF003C' : '2px solid transparent',
+                borderBottom: isFocused === (isSignup ? 'username' : 'loginIdentifier') ? '2px solid #FF003C' : '2px solid transparent',
               }}
-              placeholder="ENTER_USERNAME"
+              placeholder={isSignup ? 'ENTER_USERNAME' : 'ENTER_EMAIL_OR_USERNAME'}
             />
             <style>{`
               input::placeholder {

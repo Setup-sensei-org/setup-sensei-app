@@ -24,15 +24,35 @@ import {
 // ============================================================================
 
 /**
- * Login user with email and password
+ * Login user with email or username
+ * Supports: email directly, or username lookup
  */
 export async function login(payload: AuthPayload): Promise<AuthResponse> {
-  if (!payload.email) {
-    throw new Error('Email is required for login');
+  let email: string;
+
+  if (!payload.loginIdentifier) {
+    throw new Error('Email or username is required for login');
+  }
+
+  if (payload.loginIdentifier.includes('@')) {
+    // Looks like an email, use it directly
+    email = payload.loginIdentifier;
+  } else {
+    // Plain username, look it up in profiles
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('username', payload.loginIdentifier)
+      .single();
+
+    if (profileError || !profileData?.email) {
+      throw new Error('User not found');
+    }
+    email = profileData.email;
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: payload.email,
+    email,
     password: payload.password,
   });
 
@@ -76,9 +96,18 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
     throw new Error('Email is required for signup');
   }
 
+  if (!payload.username) {
+    throw new Error('Username is required for signup');
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: payload.email,
     password: payload.password,
+    options: {
+      data: {
+        username: payload.username!,
+      },
+    },
   });
 
   if (error) {
@@ -89,25 +118,12 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
     throw new Error('Signup failed: Missing user data');
   }
 
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ username: payload.username, electrical_sync_rate: 0 })
-    .eq('id', data.user.id);
-
-  if (updateError) {
-    // If the profiles table doesn't have a `username` column yet (dev DBs),
-    // continue without failing signup so the user can still sign up.
-    const msg = updateError.message || String(updateError);
-    if (msg.includes("Could not find the 'username' column") || msg.includes('column "username" does not exist')) {
-      console.warn('profiles.username missing; skipping profile update during signup.');
-    } else {
-      throw new Error(`Failed to update user profile: ${updateError.message}`);
-    }
-  }
+  // Profile creation is handled by the "handle_new_user" Trigger in Supabase
+  // which copies the username from metadata to the profiles table.
 
   const user: User = {
     id: data.user.id,
-    username: payload.username,
+    username: payload.username!,
     electrical_sync_rate: 0,
     account_created_at: data.user.created_at,
     email: payload.email,
@@ -122,6 +138,25 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
     token_type: 'Bearer',
     user,
   };
+}
+
+/**
+ * Start Google OAuth login flow.
+ * Supabase will redirect the browser to Google and back to this app.
+ */
+export async function loginWithGoogle(): Promise<void> {
+  //Connecting to Supabase helper that starts an OAuth flow with Google
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      // Redirect back to the current origin (works for dev + prod)
+      redirectTo: window.location.origin,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 // ============================================================================
@@ -354,6 +389,27 @@ export async function getDrillDetail(id: string): Promise<DrillDetail> {
       neural_sync_status: drill.neural_sync_status || 'READY',
     },
   };
+}
+
+/**
+ * Initialize auth from an existing Supabase session (e.g. after OAuth redirect).
+ * Returns true if a session/access token was found and stored.
+ */
+export async function initAuthFromSupabaseSession(): Promise<boolean> {
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    console.error('Failed to get Supabase session', error);
+    return false;
+  }
+
+  const accessToken = data.session?.access_token;
+  if (accessToken) {
+    setAuthToken(accessToken);
+    return true;
+  }
+
+  return false;
 }
 /**
  * Store authentication token (optional helper for the rest of the app)

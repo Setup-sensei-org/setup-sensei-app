@@ -43,13 +43,31 @@ import {
  * - User can access protected tables with RLS policies
  */
 export async function login(payload: AuthPayload): Promise<AuthResponse> {
-  // Email is required for Supabase Auth
-  if (!payload.email) {
-    throw new Error('Email is required for login');
+  let email: string;
+
+  if (!payload.loginIdentifier) {
+    throw new Error('Email or username is required for login');
+  }
+
+  if (payload.loginIdentifier.includes('@')) {
+    // Looks like an email, use it directly
+    email = payload.loginIdentifier;
+  } else {
+    // Plain username, look it up in profiles
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('username', payload.loginIdentifier)
+      .single();
+
+    if (profileError || !profileData?.email) {
+      throw new Error('User not found');
+    }
+    email = profileData.email;
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: payload.email,
+    email,
     password: payload.password,
   });
 
@@ -95,6 +113,10 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
     throw new Error('Email is required for signup');
   }
 
+  if (!payload.username) {
+    throw new Error('Username is required for signup');
+  }
+
   // Step 1: Create auth user
   const { data, error } = await supabase.auth.signUp({
     email: payload.email,
@@ -115,7 +137,7 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
     .insert([
       {
         id: data.user.id,
-        username: payload.username,
+        username: payload.username!,
         email: payload.email,
         electrical_sync_rate: 0,
       },

@@ -13,7 +13,8 @@
  * Authentication payload for both Login and Signup operations
  */
 export interface AuthPayload {
-  username: string;
+  loginIdentifier?: string; // For login: can be username or email
+  username?: string; // For signup: the desired username
   password: string;
   email?: string; // Optional for login, required for signup
 }

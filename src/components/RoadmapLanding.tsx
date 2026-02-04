@@ -206,8 +206,7 @@ export function RoadmapLanding({ onDrillClick, roadmapNodes, drills }: RoadmapLa
           style={{
             transform: `translateY(${scrollProgress * 50}px)`,
             backgroundImage: `
-              radial-gradient(circle at 20% 30%, rgba(255, 0, 60, 0.1) 0%, transparent 50%),
-              radial-gradient(circle at 80% 70%, rgba(255, 0, 60, 0.1) 0%, transparent 50%)
+              radial-gradient(circle at 20% 30%, rgba(255, 0, 60, 0.1) 0%, transparent 50%)
             `,
           }}
         />
