@@ -16,34 +16,68 @@ export interface BleSensorConnection {
  * Connect to a single WitMotion IMU over Web Bluetooth and stream raw
  * notification bytes into IMUSample objects for a fixed duration.
  *
- * For this POC we apply a simple placeholder decode on the raw packet to
- * estimate ax/ay/az from the first few bytes, and still attach the full
- * raw byte array so the backend can refine decoding later.
+ * We treat the raw WT901 packet bytes as the source of truth and also
+ * decode accel/gyro for lightweight frontend visualisation.
  */
 
-// Very simple placeholder decoder: interpret the first 3 little-endian
-// int16 values as accelerometer axes and apply a common IMU scale factor.
-// This may need to be updated once the exact WitMotion BLE packet format
-// is confirmed, but is good enough to surface ax/ay/az in the demo.
-function decodeAccelFromBytes(bytes: Uint8Array): { ax?: number; ay?: number; az?: number } {
-  if (bytes.length < 6) {
-    return {};
+const WT901_HEADER = 0x55;
+const WT901_TYPE_ACCEL_GYRO = 0x61;
+const WT901_PACKET_LEN = 20;
+
+function extractWt901Packet(bytes: Uint8Array): Uint8Array | null {
+  // Most commonly notifications are exactly one 20-byte packet.
+  if (
+    bytes.length === WT901_PACKET_LEN &&
+    bytes[0] === WT901_HEADER &&
+    bytes[1] === WT901_TYPE_ACCEL_GYRO
+  ) {
+    return bytes;
   }
 
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // Otherwise, try to find a 0x55 0x61 frame within the notification.
+  for (let i = 0; i + WT901_PACKET_LEN <= bytes.length; i += 1) {
+    if (bytes[i] === WT901_HEADER && bytes[i + 1] === WT901_TYPE_ACCEL_GYRO) {
+      return bytes.slice(i, i + WT901_PACKET_LEN);
+    }
+  }
 
-  const axRaw = view.getInt16(0, true);
-  const ayRaw = view.getInt16(2, true);
-  const azRaw = view.getInt16(4, true);
+  return null;
+}
 
-  // Typical ±2g scale for many IMUs is 16384 LSB/g; adjust as needed.
-  const scale = 1 / 16384;
+function decodeWt901AccelGyroFromPacket(packet: Uint8Array): {
+  ax: number;
+  ay: number;
+  az: number;
+  gx: number;
+  gy: number;
+  gz: number;
+} {
+  // WT901 0x55 0x61 frame layout (little-endian int16) starting at offset 2:
+  // ax, ay, az, gx, gy, gz
+  const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
+
+  const axRaw = view.getInt16(2, true);
+  const ayRaw = view.getInt16(4, true);
+  const azRaw = view.getInt16(6, true);
+
+  const gxRaw = view.getInt16(8, true);
+  const gyRaw = view.getInt16(10, true);
+  const gzRaw = view.getInt16(12, true);
+
+  // User-confirmed: accel range is ±16g.
+  // WT901 family commonly uses full-scale mapping: raw/32768 * range.
+  const accelScale = 16 / 32768;
+
+  // Common WT901 gyro scale: raw/32768 * 2000 (deg/s).
+  const gyroScale = 2000 / 32768;
 
   return {
-    //Measures acceleration in g's
-    ax: axRaw * scale,
-    ay: ayRaw * scale,
-    az: azRaw * scale,
+    ax: axRaw * accelScale,
+    ay: ayRaw * accelScale,
+    az: azRaw * accelScale,
+    gx: gxRaw * gyroScale,
+    gy: gyRaw * gyroScale,
+    gz: gzRaw * gyroScale,
   };
 }
 
@@ -56,6 +90,7 @@ export async function collectImuSamplesForDuration(durationMs: number): Promise<
   const samples: IMUSample[] = [];
 
   // Opens browser prompt, requests a single device matching the WitMotion naming scheme
+  // TODO: Update the namePrefix filters below if the supplier changes the BLE advertised names.
   const device = await navigator.bluetooth.requestDevice({
     filters: [
       { namePrefix: 'WT' },
@@ -78,16 +113,20 @@ export async function collectImuSamplesForDuration(durationMs: number): Promise<
     const bytes = new Uint8Array(value.buffer);
     const timestampMs = Date.now();
 
-    const { ax, ay, az } = decodeAccelFromBytes(bytes);
+    const packet = extractWt901Packet(bytes);
+    const decoded = packet ? decodeWt901AccelGyroFromPacket(packet) : undefined;
 
     const sample: IMUSample = {
       timestamp_ms: timestampMs,
-      // Keep raw bytes so the backend can decode them later
-      raw: Array.from(bytes),
-      // Lightweight frontend-side decode for POC visualisation
-      ax,
-      ay,
-      az,
+      // Keep raw packet bytes so the backend can decode exactly what we decoded.
+      raw: Array.from(packet ?? bytes),
+      // Lightweight frontend-side decode for visualisation.
+      ax: decoded?.ax,
+      ay: decoded?.ay,
+      az: decoded?.az,
+      gx: decoded?.gx,
+      gy: decoded?.gy,
+      gz: decoded?.gz,
     };
 
     samples.push(sample);
@@ -144,14 +183,18 @@ export async function collectMultiImuSamplesForDuration(
       const bytes = new Uint8Array(value.buffer);
       const timestampMs = Date.now();
 
-      const { ax, ay, az } = decodeAccelFromBytes(bytes);
+      const packet = extractWt901Packet(bytes);
+      const decoded = packet ? decodeWt901AccelGyroFromPacket(packet) : undefined;
 
       const sample: IMUSample = {
         timestamp_ms: timestampMs,
-        raw: Array.from(bytes),
-        ax,
-        ay,
-        az,
+        raw: Array.from(packet ?? bytes),
+        ax: decoded?.ax,
+        ay: decoded?.ay,
+        az: decoded?.az,
+        gx: decoded?.gx,
+        gy: decoded?.gy,
+        gz: decoded?.gz,
         sensor_role: role,
       };
 

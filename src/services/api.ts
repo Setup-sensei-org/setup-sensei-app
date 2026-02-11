@@ -19,6 +19,8 @@ import {
   DrillDetail,
 } from '../types';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+
 // ============================================================================
 // AUTHENTICATION API
 // ============================================================================
@@ -38,17 +40,58 @@ export async function login(payload: AuthPayload): Promise<AuthResponse> {
     // Looks like an email, use it directly
     email = payload.loginIdentifier;
   } else {
-    // Plain username, look it up in profiles
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('username', payload.loginIdentifier)
-      .single();
+    // Plain username: resolve + login via backend.
+    // Rationale: `profiles` is commonly protected by RLS, so anonymous clients
+    // cannot map username -> email safely/reliably.
+    const resp = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        loginIdentifier: payload.loginIdentifier,
+        password: payload.password,
+      }),
+    });
 
-    if (profileError || !profileData?.email) {
-      throw new Error('User not found');
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(text || 'Authentication failed');
     }
-    email = profileData.email;
+
+    const tokenData = await resp.json();
+
+    if (!tokenData?.access_token || !tokenData?.refresh_token) {
+      throw new Error('Login failed: Missing session tokens');
+    }
+
+    // Hydrate supabase-js session so subsequent `.from(...)` calls are authenticated.
+    await supabase.auth.setSession({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+    });
+
+    setAuthToken(tokenData.access_token);
+
+    // We still want the same return shape as the email-login path.
+    const authUser = tokenData.user;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, electrical_sync_rate')
+      .eq('id', authUser?.id)
+      .maybeSingle();
+
+    const user: User = {
+      id: authUser?.id,
+      username: profile?.username || authUser?.email?.split('@')[0] || 'user',
+      electrical_sync_rate: profile?.electrical_sync_rate || 0,
+      account_created_at: authUser?.created_at,
+      email: authUser?.email,
+    };
+
+    return {
+      access_token: tokenData.access_token,
+      token_type: tokenData.token_type || 'Bearer',
+      user,
+    };
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -68,7 +111,7 @@ export async function login(payload: AuthPayload): Promise<AuthResponse> {
     .from('profiles')
     .select('username, electrical_sync_rate')
     .eq('id', data.user.id)
-    .single();
+    .maybeSingle();
 
   const user: User = {
     id: data.user.id,

@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load the backend .env file from the BackendCode directory.
+# This is more reliable than relying on the current working directory.
+load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")

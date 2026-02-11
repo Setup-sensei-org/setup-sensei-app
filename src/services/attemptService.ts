@@ -18,9 +18,9 @@ export interface IMUSample {
   ax?: number;
   ay?: number;
   az?: number;
-  wx?: number;
-  wy?: number;
-  wz?: number;
+  gx?: number;
+  gy?: number;
+  gz?: number;
   q0?: number;
   q1?: number;
   q2?: number;

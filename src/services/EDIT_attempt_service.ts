@@ -35,9 +35,9 @@ export interface IMUSample {
   ay?: number;
   az?: number;
   // Angular velocity (degrees/sec)
-  wx?: number;
-  wy?: number;
-  wz?: number;
+  gx?: number;
+  gy?: number;
+  gz?: number;
   // Quaternions
   q0?: number;
   q1?: number;

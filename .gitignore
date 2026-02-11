@@ -18,6 +18,25 @@ build/
 .env.test.local
 .env.production.local
 
+# Backend Python ignores
+BackendCode/.env
+BackendCode/__pycache__/
+BackendCode/*.pyc
+BackendCode/**/*.pyc
+BackendCode/.mypy_cache/
+BackendCode/.pytest_cache/
+BackendCode/.coverage
+BackendCode/coverage/
+BackendCode/coverage.*
+BackendCode/.hypothesis/
+
+# Parquet/CSV/feature outputs (do not ignore features.csv or raw.json; these are included as examples)
+# BackendCode/IMU_processing/*.csv
+# BackendCode/IMU_processing/*.parquet
+
+# Windows system files
+Thumbs.db
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
