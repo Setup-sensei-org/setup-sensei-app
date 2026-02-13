@@ -1,0 +1,168 @@
+
+  <script>
+    // ============================================
+    // DOM Elements for UI interaction
+    // ============================================
+    const connectBtn = document.getElementById("connectBtn");
+    const statusEl = document.getElementById("status");
+    const outputEl = document.getElementById("output");
+
+    const FFE5_SERVICE_UUID = "0000ffe5-0000-1000-8000-00805f9a34fb";
+    //FFE4 Characteristic streams raw IMU data (accel, gyro, etc.) in a single packet.
+    const FFE4_CHAR_UUID    = "0000ffe4-0000-1000-8000-00805f9a34fb";
+
+    // Store references to the connected sensors
+    // Each sensor is an object: { device, server, service, characteristic, el }
+    const sensors = [];
+
+    function logStatus(msg) {
+      statusEl.textContent = "Status: " + msg;
+      console.log(msg);
+    }
+
+    // Converts raw sensor bytes to readable hex format and displays in real-time
+    function logData(bytes) {
+        //bytes is a Uint8Array so convert to typed array for easier mapping
+      const hex = Array.from(bytes)
+      //converting byte to hex string, and ensuring it is made of 2 digits
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join(" ");
+      outputEl.textContent = hex + "\n" + outputEl.textContent;
+    }
+
+    // ============================================
+    // Main BLE Connection Flow
+    // ============================================
+    // Main BLE Connection Flow
+    // Clicking the button starts a flow that can connect multiple IMUs.
+    // After each successful connection the user is asked whether to add another.
+    connectBtn.onclick = async () => {
+      try {
+        let keepGoing = true;
+        while (keepGoing) {
+          // Attempt to connect one device. If user cancels the picker, exit loop.
+          const ok = await connectOneSensor().catch(err => {
+            // If the user dismissed the device picker, just stop asking.
+            console.debug('connect canceled or failed', err);
+            return false;
+          });
+          if (!ok) break;
+          // Ask the user if they want to connect another device
+          keepGoing = confirm('Connect another IMU? Click OK to add another, Cancel to stop.');
+        }
+      } catch (err) {
+        console.error(err);
+        logStatus('ERROR – see console');
+      }
+    };
+
+    // Connect a single sensor and wire up its UI and event handlers
+    async function connectOneSensor() {
+      logStatus('requesting device...');
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { namePrefix: 'WT' },
+          { namePrefix: 'WitMotion' }
+        ],
+        optionalServices: [FFE5_SERVICE_UUID]
+      });
+
+      logStatus('connecting to GATT for ' + (device.name || device.id));
+      const server = await device.gatt.connect();
+
+      logStatus('getting service FFE5...');
+      const service = await server.getPrimaryService(FFE5_SERVICE_UUID);
+
+      logStatus('getting characteristic FFE4...');
+      const characteristic = await service.getCharacteristic(FFE4_CHAR_UUID);
+
+      logStatus('starting notifications...');
+      await characteristic.startNotifications();
+
+      // Create per-sensor UI
+      const sensorEl = createSensorPanel(device);
+
+      // Sensor object to keep track of resources
+      const sensor = { device, server, service, characteristic, el: sensorEl };
+      sensors.push(sensor);
+
+      // Event: incoming data for this sensor — append to its panel only
+      characteristic.addEventListener('characteristicvaluechanged', (event) => {
+        const value = event.target.value;
+        const bytes = new Uint8Array(value.buffer);
+        appendSensorData(sensor, bytes);
+      });
+
+      // Handle disconnects initiated by device or user
+      device.addEventListener('gattserverdisconnected', () => {
+        onSensorDisconnected(sensor);
+      });
+
+      logStatus('CONNECTED – receiving data from ' + (device.name || device.id));
+      return true;
+    }
+
+    // Create a small panel for each connected sensor with its own log and disconnect button
+    function createSensorPanel(device) {
+      const container = document.getElementById('sensorsContainer');
+      const panel = document.createElement('div');
+      panel.style.border = '1px solid rgba(255,255,255,0.08)';
+      panel.style.padding = '8px';
+      panel.style.marginTop = '8px';
+
+      const title = document.createElement('div');
+      title.textContent = (device.name || 'Unknown') + ' — ' + device.id;
+      title.style.fontWeight = '600';
+      panel.appendChild(title);
+
+      const pre = document.createElement('pre');
+      pre.textContent = '(raw bytes will appear here)';
+      pre.style.maxHeight = '160px';
+      pre.style.overflowY = 'auto';
+      panel.appendChild(pre);
+
+      const btn = document.createElement('button');
+      btn.textContent = 'Disconnect';
+      btn.onclick = async () => {
+        try {
+          if (device.gatt.connected) {
+            await device.gatt.disconnect();
+          }
+        } catch (err) {
+          console.error('disconnect error', err);
+        }
+      };
+      panel.appendChild(btn);
+
+      container.appendChild(panel);
+      return { panel, logEl: pre, titleEl: title, disconnectBtn: btn };
+    }
+
+    // Append hex-formatted data to a sensor's panel
+    function appendSensorData(sensor, bytes) {
+      const hex = Array.from(bytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' ');
+      const now = new Date().toLocaleTimeString();
+      sensor.el.logEl.textContent = now + '  ' + hex + '\n' + sensor.el.logEl.textContent;
+    }
+
+    // Cleanup when a sensor disconnects
+    function onSensorDisconnected(sensor) {
+      logStatus('Sensor disconnected: ' + (sensor.device.name || sensor.device.id));
+      // Try to stop notifications if possible
+      try {
+        if (sensor.characteristic) {
+          sensor.characteristic.stopNotifications().catch(() => {});
+        }
+      } catch (e) { /* ignore */ }
+      // Remove from sensors array
+      const idx = sensors.indexOf(sensor);
+      if (idx >= 0) sensors.splice(idx, 1);
+      // Update UI
+      if (sensor.el && sensor.el.panel) sensor.el.panel.style.opacity = '0.5';
+    }
+  </script>
+
+</body>
+</html>

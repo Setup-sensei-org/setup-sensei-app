@@ -1,0 +1,44 @@
+-- Stores user upload attempts and metadata for IMU session files.
+create table if not exists public.attempts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  raw_file_path text not null,
+  status text not null default 'created',
+  pipeline_version text not null default 'p0',
+  movement_type text,
+  device_set_id text,
+  sensor_count int not null default 4,
+  app_version text,
+  capture_started_at timestamptz,
+  capture_ended_at timestamptz,
+  uploaded_at timestamptz,
+  processed_at timestamptz,
+  retry_count int not null default 0,
+  last_error text,
+  created_at timestamptz not null default now()
+);
+
+-- Speed up queries by user.
+create index if not exists attempts_user_id_idx
+  on public.attempts (user_id);
+
+-- Support filtering by status and recency.
+create index if not exists attempts_status_created_at_idx
+  on public.attempts (status, created_at);
+
+-- Require row-level security policies.
+alter table public.attempts enable row level security;
+
+-- Allow users to read only their own attempts.
+create policy "attempts_select_own"
+on public.attempts
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+-- Allow users to insert only their own attempts.
+create policy "attempts_insert_own"
+on public.attempts
+for insert
+to authenticated
+with check (auth.uid() = user_id);

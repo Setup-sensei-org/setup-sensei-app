@@ -1,0 +1,11 @@
+select
+  created_at,
+  event_type,
+  ip_address,
+  user_id,
+  provider,
+  error,
+  raw_user_meta_data
+from auth.audit_log_entries
+order by created_at desc
+limit 50;

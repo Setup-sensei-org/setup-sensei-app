@@ -1,0 +1,7 @@
+-- Migration 13: Add electrical_sync_rate to profiles table
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS electrical_sync_rate numeric DEFAULT 0 CHECK (electrical_sync_rate >= 0 AND electrical_sync_rate <= 100);
+
+-- Index for faster lookups by sync rate
+CREATE INDEX IF NOT EXISTS idx_profiles_electrical_sync_rate
+  ON public.profiles(electrical_sync_rate);
