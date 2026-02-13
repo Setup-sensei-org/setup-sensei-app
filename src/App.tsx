@@ -3,6 +3,8 @@ import { RoadmapLanding } from './components/RoadmapLanding';
 import { AnalyticsScreen } from './components/screens/AnalyticsScreen';
 import { AccountScreen } from './components/screens/AccountScreen';
 import { ActiveDrillScreen } from './components/screens/ActiveDrillScreen';
+import { TrainingScreen } from './components/screens/TrainingScreen';
+import { TrainDrillScreen } from './components/screens/TrainDrillScreen';
 import { SideNavRail } from './components/SideNavRail';
 import { BackgroundTexture } from './components/BackgroundTexture';
 import { MatteTexture } from './components/MatteTexture';
@@ -26,15 +28,17 @@ import {
   getDrills,
 } from './services/api';
 
-type Screen = 'roadmap' | 'analytics' | 'account';
+type Screen = 'roadmap' | 'analytics' | 'training' | 'account';
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<Screen>('roadmap');
   const [activeDrill, setActiveDrill] = useState<DrillDetail | null>(null);
+  const [showTrainDrill, setShowTrainDrill] = useState(false);
   const [roadmapNodes, setRoadmapNodes] = useState<RoadmapNode[] | undefined>();
   const [sessionAnalytics, setSessionAnalytics] = useState<SessionAnalytics | undefined>();
   const [drills, setDrills] = useState<DrillOverview[] | undefined>();
   const [authenticated, setAuthenticated] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const handleDrillClick = (drill: DrillDetail) => {
     setActiveDrill(drill);
@@ -91,25 +95,21 @@ export default function App() {
   }, []);
 
   const handleAuthSubmit = async (payload: AuthPayload, mode: 'login' | 'signup') => {
+    setAuthError(null);
     try {
       const response = mode === 'signup'
         ? await signup(payload)
         : await login(payload);
 
-      // Store the authentication token
       setAuthToken(response.access_token);
-
       setAuthenticated(true);
       loadData();
 
-      // After successful auth, send user to the roadmap
       setActiveDrill(null);
       setActiveScreen('roadmap');
-
-      // TODO: Handle successful authentication (e.g., redirect, update UI state)
-      console.log('Authentication successful:', response.user);
     } catch (error) {
-      // TODO: Handle authentication errors (e.g., show error message to user)
+      const message = error instanceof Error ? error.message : 'Authentication failed';
+      setAuthError(message);
       console.error('Authentication failed:', error);
     }
   };
@@ -132,7 +132,11 @@ export default function App() {
       <MatteTexture />
       
       {/* Side Navigation Rail */}
-      <SideNavRail activeScreen={activeScreen} onNavigate={setActiveScreen} />
+      <SideNavRail activeScreen={activeScreen} onNavigate={(screen) => {
+        setActiveScreen(screen);
+        setActiveDrill(null);
+        setShowTrainDrill(false);
+      }} />
 
       {/* Main Content Area */}
       <div 
@@ -154,6 +158,13 @@ export default function App() {
             )}
             {activeScreen === 'analytics' && (
               <AnalyticsScreen analytics={sessionAnalytics} />
+            )}
+            {activeScreen === 'training' && (
+              showTrainDrill ? (
+                <TrainDrillScreen onBack={() => setShowTrainDrill(false)} />
+              ) : (
+                <TrainingScreen onStartTrainDrill={() => setShowTrainDrill(true)} />
+              )
             )}
             {activeScreen === 'account' && (
               <AccountScreen

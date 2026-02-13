@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Target, TrendingUp, User } from 'lucide-react';
+import { Target, TrendingUp, Dumbbell, User } from 'lucide-react';
 
-type Screen = 'roadmap' | 'analytics' | 'account';
+type Screen = 'roadmap' | 'analytics' | 'training' | 'account';
 
 interface SideNavRailProps {
   activeScreen: Screen;
@@ -14,6 +14,7 @@ export function SideNavRail({ activeScreen, onNavigate }: SideNavRailProps) {
   const navItems = [
     { id: 'roadmap' as Screen, icon: Target, label: 'ROADMAP' },
     { id: 'analytics' as Screen, icon: TrendingUp, label: 'ANALYTICS' },
+    { id: 'training' as Screen, icon: Dumbbell, label: 'TRAINING' },
     { id: 'account' as Screen, icon: User, label: 'ACCOUNT' },
   ];
 
