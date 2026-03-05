@@ -162,12 +162,16 @@ export async function collectImuSamplesForDuration(durationMs: number): Promise<
 export async function collectMultiImuSamplesForDuration(
   sensors: { role: string; characteristic: BluetoothRemoteGATTCharacteristic }[],
   durationMs: number
-): Promise<IMUSample[]> {
+): Promise<{ samples: IMUSample[]; sampleCountByRole: Record<string, number> }> {
   if (!sensors.length) {
-    return [];
+    return { samples: [], sampleCountByRole: {} };
   }
 
   const samples: IMUSample[] = [];
+  const sampleCountByRole: Record<string, number> = {};
+  for (const { role } of sensors) {
+    sampleCountByRole[role] = 0;
+  }
 
   const listeners: {
     characteristic: BluetoothRemoteGATTCharacteristic;
@@ -199,6 +203,7 @@ export async function collectMultiImuSamplesForDuration(
       };
 
       samples.push(sample);
+      sampleCountByRole[role] = (sampleCountByRole[role] || 0) + 1;
     };
 
     characteristic.addEventListener('characteristicvaluechanged', handler);
@@ -206,8 +211,8 @@ export async function collectMultiImuSamplesForDuration(
 
     try {
       await characteristic.startNotifications();
-    } catch {
-      // ignore start notification failure for a given sensor
+    } catch (err) {
+      console.error(`[bleImu] startNotifications failed for ${role}:`, err);
     }
   }
 
@@ -224,5 +229,5 @@ export async function collectMultiImuSamplesForDuration(
     }
   }
 
-  return samples;
+  return { samples, sampleCountByRole };
 }

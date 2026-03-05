@@ -122,7 +122,8 @@ export function ActiveDrillScreen({ drill, onBack }: ActiveDrillScreenProps) {
 
       if (activeSensors.length > 0) {
         setStatusMessage('Recording from connected IMUs...');
-        samples = await collectMultiImuSamplesForDuration(activeSensors, recordingDurationMs);
+        const result = await collectMultiImuSamplesForDuration(activeSensors, recordingDurationMs);
+        samples = result.samples;
       } else {
         setStatusMessage('Connect to your IMU in the browser prompt...');
         samples = await collectImuSamplesForDuration(recordingDurationMs);

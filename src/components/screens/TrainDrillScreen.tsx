@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import {
   collectMultiImuSamplesForDuration,
@@ -6,6 +6,14 @@ import {
   FFE4_CHAR_UUID,
 } from '../../services/bleImu';
 import { uploadTrainingRecording, fetchTrainingRecordings } from '../../services/trainingService';
+
+// ──── DEV MOCK: set to true to test without real BLE hardware ────
+const DEV_MOCK_BLE = false;
+// When true:
+//   - Tapping a sensor card fakes a connection instantly
+//   - Run `window.__simulateDisconnect('left_wrist')` in the console to fire a disconnect
+//   - Recording returns fake samples (with one sensor missing data if it's disconnected)
+// ──────────────────────────────────────────────────────────────────
 
 interface TrainDrillScreenProps {
   onBack: () => void;
@@ -15,6 +23,7 @@ type SensorRole = 'left_wrist' | 'right_wrist' | 'left_ankle' | 'right_ankle';
 
 type SensorInfo = {
   connected: boolean;
+  disconnectedAfterPairing: boolean;
   label: string;
   deviceId?: string;
   device?: BluetoothDevice;
@@ -38,15 +47,73 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
   const [selectedDurationMs, setSelectedDurationMs] = useState(4000);
 
   const [sensorStatus, setSensorStatus] = useState<Record<SensorRole, SensorInfo>>({
-    left_wrist: { connected: false, label: 'LEFT WRIST' },
-    right_wrist: { connected: false, label: 'RIGHT WRIST' },
-    left_ankle: { connected: false, label: 'LEFT ANKLE' },
-    right_ankle: { connected: false, label: 'RIGHT ANKLE' },
+    left_wrist: { connected: false, disconnectedAfterPairing: false, label: 'LEFT WRIST' },
+    right_wrist: { connected: false, disconnectedAfterPairing: false, label: 'RIGHT WRIST' },
+    left_ankle: { connected: false, disconnectedAfterPairing: false, label: 'LEFT ANKLE' },
+    right_ankle: { connected: false, disconnectedAfterPairing: false, label: 'RIGHT ANKLE' },
   });
 
   const [assignedDevices, setAssignedDevices] = useState<Record<string, SensorRole>>({});
 
+  const disconnectCleanupRef = useRef<Record<string, () => void>>({});
+
+  const handleDisconnect = useCallback((role: SensorRole) => {
+    setSensorStatus((prev) => ({
+      ...prev,
+      [role]: {
+        ...prev[role],
+        connected: false,
+        disconnectedAfterPairing: true,
+        device: undefined,
+        server: undefined,
+        characteristic: undefined,
+      },
+    }));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(disconnectCleanupRef.current).forEach((cleanup) => cleanup());
+      disconnectCleanupRef.current = {};
+    };
+  }, []);
+
+  // Expose disconnect simulator to the browser console when mocking
+  useEffect(() => {
+    if (!DEV_MOCK_BLE) return;
+    (window as any).__simulateDisconnect = (role: SensorRole) => {
+      console.log(`[DEV] simulating disconnect for ${role}`);
+      handleDisconnect(role);
+    };
+    return () => { delete (window as any).__simulateDisconnect; };
+  }, [handleDisconnect]);
+
   const handleConnectSensor = async (role: SensorRole) => {
+    // ── DEV MOCK path ──
+    if (DEV_MOCK_BLE) {
+      const fakeId = `MOCK_${role.toUpperCase()}`;
+      setSensorStatus((prev) => ({
+        ...prev,
+        [role]: {
+          connected: true,
+          disconnectedAfterPairing: false,
+          label: fakeId,
+          deviceId: fakeId,
+          characteristic: {
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            startNotifications: () => Promise.resolve(),
+            stopNotifications: () => Promise.resolve(),
+          } as unknown as BluetoothRemoteGATTCharacteristic,
+        },
+      }));
+      setAssignedDevices((prev) => ({ ...prev, [fakeId]: role }));
+      setStatusMessage(null);
+      setErrorMessage(null);
+      return;
+    }
+
+    // ── Real BLE path ──
     try {
       if (typeof navigator === 'undefined' || !navigator.bluetooth) {
         setErrorMessage('Web Bluetooth is not available in this browser.');
@@ -69,6 +136,19 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
       const id = device.id || 'UNKNOWN_ID';
       const name = id;
 
+      // Remove previous disconnect listener for this role if any
+      if (disconnectCleanupRef.current[role]) {
+        disconnectCleanupRef.current[role]();
+        delete disconnectCleanupRef.current[role];
+      }
+
+      // Register disconnect listener
+      const onDisconnected = () => handleDisconnect(role);
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      disconnectCleanupRef.current[role] = () => {
+        device.removeEventListener('gattserverdisconnected', onDisconnected);
+      };
+
       setAssignedDevices((prev) => {
         const existingRole = prev[id];
         if (existingRole && existingRole !== role) {
@@ -83,6 +163,7 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
           ...prevStatus,
           [role]: {
             connected: true,
+            disconnectedAfterPairing: false,
             label: name,
             deviceId: id,
             device,
@@ -128,13 +209,24 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
         throw new Error('All 4 sensors must be connected before recording.');
       }
 
-      const samples = await collectMultiImuSamplesForDuration(activeSensors, selectedDurationMs);
+      const { samples, sampleCountByRole } = await collectMultiImuSamplesForDuration(activeSensors, selectedDurationMs);
 
       if (!samples.length) {
         throw new Error('No IMU samples collected from BLE devices');
       }
 
-      console.log('[TrainDrill] collected samples:', samples.length, 'duration:', selectedDurationMs);
+      // Post-recording validation: ensure every sensor produced data
+      const missingSensors = activeSensors
+        .filter(({ role }) => !sampleCountByRole[role] || sampleCountByRole[role] === 0)
+        .map(({ role }) => role);
+
+      if (missingSensors.length > 0) {
+        throw new Error(
+          `No data received from sensor(s): ${missingSensors.join(', ')}. They may have disconnected during recording.`
+        );
+      }
+
+      console.log('[TrainDrill] collected samples:', samples.length, 'duration:', selectedDurationMs, 'by role:', sampleCountByRole);
       console.log('[TrainDrill] first 3 samples:', samples.slice(0, 3));
 
       setStatusMessage('uploading to database...');
@@ -227,6 +319,17 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
             ).map((role) => {
               const sensor = sensorStatus[role];
               const isConnected = sensor.connected;
+              const wasLost = !isConnected && sensor.disconnectedAfterPairing;
+
+              const borderColor = isConnected ? '#22c55e' : wasLost ? '#f59e0b' : '#4b5563';
+              const bgColor = isConnected
+                ? 'rgba(34, 197, 94, 0.05)'
+                : wasLost
+                  ? 'rgba(245, 158, 11, 0.06)'
+                  : 'rgba(10, 10, 10, 0.6)';
+              const textColor = isConnected ? '#22c55e' : wasLost ? '#f59e0b' : '#9ca3af';
+              const labelColor = isConnected ? '#22c55e' : wasLost ? '#f59e0b' : '#666';
+
               return (
                 <button
                   key={role}
@@ -235,8 +338,8 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
                   disabled={isRecording}
                   className="border text-left transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
                   style={{
-                    borderColor: isConnected ? '#22c55e' : '#4b5563',
-                    background: isConnected ? 'rgba(34, 197, 94, 0.05)' : 'rgba(10, 10, 10, 0.6)',
+                    borderColor,
+                    background: bgColor,
                     padding: '20px',
                     minHeight: '88px',
                     display: 'flex',
@@ -244,36 +347,47 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
                     justifyContent: 'space-between',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isConnected) {
+                    if (!isConnected && !wasLost) {
                       e.currentTarget.style.borderColor = '#ff003c';
                       e.currentTarget.style.background = 'rgba(255, 0, 60, 0.04)';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isConnected) {
+                    if (!isConnected && !wasLost) {
                       e.currentTarget.style.borderColor = '#4b5563';
                       e.currentTarget.style.background = 'rgba(10, 10, 10, 0.6)';
+                    } else if (wasLost) {
+                      e.currentTarget.style.borderColor = '#f59e0b';
+                      e.currentTarget.style.background = 'rgba(245, 158, 11, 0.06)';
                     }
                   }}
                 >
                   <span
                     className="font-mono text-[9px] tracking-widest block"
-                    style={{ color: isConnected ? '#22c55e' : '#666' }}
+                    style={{ color: labelColor }}
                   >
                     {role.replace('_', ' ').toUpperCase()}
                   </span>
                   <span
                     className="font-mono text-xs tracking-wider block mt-2"
-                    style={{ color: isConnected ? '#22c55e' : '#9ca3af' }}
+                    style={{ color: textColor }}
                   >
                     {isConnected
                       ? `${sensor.deviceId || sensor.label} ✓`
-                      : 'TAP TO CONNECT'}
+                      : wasLost
+                        ? 'CONNECTION_LOST — TAP_TO_RECONNECT'
+                        : 'TAP TO CONNECT'}
                   </span>
                   {isConnected && (
                     <div
                       className="mt-3 h-[2px] w-full"
                       style={{ background: 'linear-gradient(90deg, #22c55e, transparent)' }}
+                    />
+                  )}
+                  {wasLost && (
+                    <div
+                      className="mt-3 h-[2px] w-full circuit-pulse-amber"
+                      style={{ background: 'linear-gradient(90deg, #f59e0b, transparent)' }}
                     />
                   )}
                 </button>

@@ -1161,6 +1161,22 @@
   animation: 2s ease-in-out infinite circuit-pulse;
 }
 
+@keyframes circuit-pulse-amber {
+  0%, 100% {
+    opacity: .4;
+    filter: brightness();
+  }
+
+  50% {
+    opacity: 1;
+    filter: brightness(1.5) drop-shadow(0 0 8px #f59e0b);
+  }
+}
+
+.circuit-pulse-amber {
+  animation: 2s ease-in-out infinite circuit-pulse-amber;
+}
+
 @keyframes hexagon-pulse {
   0%, 100% {
     filter: drop-shadow(0 0 8px #ff003c);
