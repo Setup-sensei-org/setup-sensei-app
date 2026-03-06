@@ -7,6 +7,21 @@ import { IMUSample } from './attemptService';
 export const FFE5_SERVICE_UUID = '0000ffe5-0000-1000-8000-00805f9a34fb';
 export const FFE4_CHAR_UUID = '0000ffe4-0000-1000-8000-00805f9a34fb';
 
+// Standard Bluetooth Battery Service
+export const BATTERY_SERVICE_UUID = 0x180f;
+export const BATTERY_LEVEL_CHAR_UUID = 0x2a19;
+
+export async function readBatteryLevel(server: BluetoothRemoteGATTServer): Promise<number | null> {
+  try {
+    const service = await server.getPrimaryService(BATTERY_SERVICE_UUID);
+    const char = await service.getCharacteristic(BATTERY_LEVEL_CHAR_UUID);
+    const value = await char.readValue();
+    return value.getUint8(0);
+  } catch {
+    return null;
+  }
+}
+
 export interface BleSensorConnection {
   device: BluetoothDevice;
   server: BluetoothRemoteGATTServer;

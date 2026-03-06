@@ -4,6 +4,8 @@ import {
   collectMultiImuSamplesForDuration,
   FFE5_SERVICE_UUID,
   FFE4_CHAR_UUID,
+  BATTERY_SERVICE_UUID,
+  readBatteryLevel,
 } from '../../services/bleImu';
 import { uploadTrainingRecording, fetchTrainingRecordings } from '../../services/trainingService';
 
@@ -29,6 +31,7 @@ type SensorInfo = {
   device?: BluetoothDevice;
   server?: BluetoothRemoteGATTServer;
   characteristic?: BluetoothRemoteGATTCharacteristic;
+  batteryPercent?: number | null;
 };
 
 const DURATION_OPTIONS = [
@@ -127,11 +130,13 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
           { namePrefix: 'WT' },
           { namePrefix: 'WitMotion' },
         ],
-        optionalServices: [FFE5_SERVICE_UUID],
+        optionalServices: [FFE5_SERVICE_UUID, BATTERY_SERVICE_UUID],
       });
       const server = await device.gatt!.connect();
       const service = await server.getPrimaryService(FFE5_SERVICE_UUID);
       const characteristic = await service.getCharacteristic(FFE4_CHAR_UUID);
+
+      const batteryPercent = await readBatteryLevel(server);
 
       const id = device.id || 'UNKNOWN_ID';
       const name = id;
@@ -169,6 +174,7 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
             device,
             server,
             characteristic,
+            batteryPercent,
           },
         }));
 
@@ -362,12 +368,24 @@ export function TrainDrillScreen({ onBack }: TrainDrillScreenProps) {
                     }
                   }}
                 >
-                  <span
-                    className="font-mono text-[9px] tracking-widest block"
-                    style={{ color: labelColor }}
-                  >
-                    {role.replace('_', ' ').toUpperCase()}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="font-mono text-[9px] tracking-widest block"
+                      style={{ color: labelColor }}
+                    >
+                      {role.replace('_', ' ').toUpperCase()}
+                    </span>
+                    {isConnected && sensor.batteryPercent != null && (
+                      <span
+                        className="font-mono text-[9px] tracking-wider"
+                        style={{
+                          color: sensor.batteryPercent > 20 ? '#22c55e' : '#ef4444',
+                        }}
+                      >
+                        {sensor.batteryPercent}%
+                      </span>
+                    )}
+                  </div>
                   <span
                     className="font-mono text-xs tracking-wider block mt-2"
                     style={{ color: textColor }}
